@@ -4,6 +4,8 @@ from utils.callbacks import (
     EVENT_BACK_TO_LIST,
     START_MAIN_MENU,
     event_discussion,
+    event_discussion_cancel,
+    event_discussion_write,
     event_going,
     event_not_going,
     event_participants,
@@ -34,7 +36,22 @@ def event_card_keyboard(event_id: int, going: int, not_going: int):
     return builder.as_markup()
 
 
-def discussion_back_keyboard(event_id: int):
+def discussion_keyboard(event_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=t("button.discussion.write"), callback_data=event_discussion_write(event_id))
+    builder.button(text=t("button.back"), callback_data=event_view(event_id))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def discussion_write_keyboard(event_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=t("button.back"), callback_data=event_discussion_cancel(event_id))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def participants_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.back"), callback_data=event_view(event_id))
     builder.adjust(1)

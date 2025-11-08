@@ -19,3 +19,7 @@ class EditEventState(StatesGroup):
     reminders = State()
     confirmation = State()
 
+
+class DiscussionState(StatesGroup):
+    writing = State()
+

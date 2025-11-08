@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 import asyncpg
 
@@ -10,6 +10,13 @@ from utils.constants import STATUS_GOING, STATUS_NOT_GOING
 class RegistrationStats:
     going: int
     not_going: int
+
+
+@dataclass(frozen=True)
+class Participant:
+    user_id: int
+    username: Optional[str]
+    status: str
 
 
 class RegistrationRepository:
@@ -54,4 +61,22 @@ class RegistrationRepository:
         """
         rows = await self._pool.fetch(query, event_id, status)
         return [row["telegram_id"] for row in rows]
+
+    async def list_participants(self, event_id: int) -> Sequence[Participant]:
+        query = """
+        SELECT r.user_id, u.username, r.status
+        FROM registrations AS r
+        JOIN users AS u ON u.id = r.user_id
+        WHERE r.event_id = $1
+        ORDER BY r.status DESC, u.username NULLS LAST
+        """
+        rows = await self._pool.fetch(query, event_id)
+        return [
+            Participant(
+                user_id=row["user_id"],
+                username=row["username"],
+                status=row["status"],
+            )
+            for row in rows
+        ]
 
