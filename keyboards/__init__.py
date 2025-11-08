@@ -1,4 +1,4 @@
-from .event_card import discussion_keyboard, discussion_write_keyboard, event_card_keyboard, event_list_keyboard, participants_keyboard
+from .event_card import event_card_keyboard, event_list_keyboard
 from .main_menu import back_to_main_keyboard, main_menu_keyboard, start_keyboard
 from .settings import (
     cancel_event_keyboard,
@@ -16,9 +16,6 @@ from .settings import (
 __all__ = [
     "event_card_keyboard",
     "event_list_keyboard",
-    "discussion_keyboard",
-    "discussion_write_keyboard",
-    "participants_keyboard",
     "back_to_main_keyboard",
     "main_menu_keyboard",
     "start_keyboard",
