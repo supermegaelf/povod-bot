@@ -1,106 +1,96 @@
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+import textwrap
 
-from typing import Sequence
-
-from database.repositories.discussions import DiscussionMessage
 from database.repositories.events import Event
-from database.repositories.registrations import Participant, RegistrationStats
 from services.registration_service import Availability
 from utils.i18n import t
-from utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
 def format_event_summary(event: Event) -> str:
-    event_datetime = datetime.combine(event.date, event.time)
-    datetime_str = event_datetime.strftime(t("format.display_datetime"))
-    cost_value = f"{event.cost:.2f}"
-    cost_line = (
-        t("event.summary.cost", cost=cost_value)
-        if event.cost and event.cost > 0
-        else t("event.summary.cost_free")
-    )
+    if event.time:
+        event_datetime = datetime.combine(event.date, event.time)
+        moment_line = t("event.summary.datetime", datetime=event_datetime.strftime(t("format.display_datetime")))
+    else:
+        moment_line = t("event.summary.date", date=event.date.strftime(t("format.display_date")))
     lines = [
         t("event.summary.header", title=event.title),
-        t("event.summary.datetime", datetime=datetime_str),
-        t("event.summary.place", place=event.place),
-        cost_line,
+        moment_line,
     ]
+    if event.place:
+        lines.append(t("event.summary.place", place=event.place))
+    if event.cost is not None:
+        if event.cost > 0:
+            lines.append(t("event.summary.cost", cost=_format_cost(event.cost)))
+        elif event.cost == 0:
+            lines.append(t("event.summary.cost_free"))
     return "\n".join(lines)
 
 
-def format_event_card(event: Event, stats: RegistrationStats, availability: Availability) -> str:
-    event_datetime = datetime.combine(event.date, event.time)
-    date_str = event_datetime.strftime(t("format.display_date"))
-    time_str = event_datetime.strftime(t("format.display_time"))
-    lines = [
-        t("event.card.header", title=event.title),
-        t("event.card.date", date=date_str),
-        t("event.card.time", time=time_str),
-        t("event.card.place", place=event.place),
-    ]
+def format_event_card(event: Event, availability: Availability | None = None) -> str:
+    lines: list[str] = [t("event.card.header", title=event.title)]
+
     if event.description:
         lines.append("")
-        lines.append(t("event.card.description", description=event.description))
-    if event.cost and event.cost > 0:
-        lines.append("")
-        lines.append(t("event.card.cost", cost=f"{event.cost:.2f}"))
-    else:
-        lines.append("")
-        lines.append(t("event.card.cost_free"))
-    if availability.capacity is None:
-        lines.append(t("event.card.capacity_unlimited"))
-    else:
-        lines.append(
-            t(
-                "event.card.capacity",
-                free=availability.free,
-                capacity=availability.capacity,
-            )
-        )
-    lines.append("")
-    lines.append(t("event.card.going", count=stats.going))
-    lines.append(t("event.card.not_going", count=stats.not_going))
-    return "\n".join(lines)
+        lines.append(_format_description(event.description))
 
+    detail_lines: list[str] = []
 
-def format_discussion(messages: Sequence[DiscussionMessage], event_title: str) -> str:
-    if not messages:
-        return t("discussion.empty", title=event_title)
-    lines: list[str] = [t("discussion.header", title=event_title)]
-    for message in reversed(messages):
-        author = message.username or t("discussion.anonymous", id=message.user_id)
-        timestamp = message.created_at.strftime(t("format.display_datetime"))
-        lines.append("")
-        lines.append(f"<b>{author}</b> — {timestamp}")
-        lines.append(message.message)
-    return "\n".join(lines)
+    if event.date and event.time:
+        event_datetime = datetime.combine(event.date, event.time)
+        detail_lines.append(t("event.card.date", date=event_datetime.strftime(t("format.display_date"))))
+        detail_lines.append(t("event.card.time", time=event_datetime.strftime(t("format.display_time"))))
+    elif event.date:
+        detail_lines.append(t("event.card.date", date=event.date.strftime(t("format.display_date"))))
+    if event.place:
+        detail_lines.append(t("event.card.place", place=event.place))
 
+    if event.cost is not None:
+        if event.cost > 0:
+            detail_lines.append(t("event.card.cost", cost=_format_cost(event.cost)))
+        elif event.cost == 0:
+            detail_lines.append(t("event.card.cost_free"))
 
-def format_participants(participants: Sequence[Participant], event_title: str) -> str:
-    if not participants:
-        return t("participants.empty", title=event_title)
-    going: list[str] = []
-    not_going: list[str] = []
-    for participant in participants:
-        name = participant.username or t("participants.anonymous", id=participant.user_id)
-        line = f"- {name}"
-        if participant.status == STATUS_GOING:
-            going.append(line)
-        elif participant.status == STATUS_NOT_GOING:
-            not_going.append(line)
+    if availability is not None:
+        if availability.capacity is None:
+            detail_lines.append(t("event.card.capacity_unlimited"))
         else:
-            going.append(line)
+            detail_lines.append(
+                t(
+                    "event.card.capacity",
+                    free=availability.free,
+                    capacity=availability.capacity,
+                )
+            )
 
-    sections: list[tuple[str, list[str]]] = []
-    if going:
-        sections.append((t("participants.going"), going))
-    if not_going:
-        sections.append((t("participants.not_going"), not_going))
-
-    lines: list[str] = [t("participants.header", title=event_title)]
-    for title, names in sections:
+    if detail_lines:
         lines.append("")
-        lines.append(f"<b>{title}</b>")
-        lines.extend(names)
+        lines.extend(detail_lines)
+
     return "\n".join(lines)
+
+
+def _format_cost(value: float | None) -> str:
+    if value is None:
+        return "0"
+    decimal_value = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    cost_str = format(decimal_value, "f")
+    if "." in cost_str:
+        cost_str = cost_str.rstrip("0").rstrip(".")
+    return cost_str or "0"
+
+
+def _format_description(text: str, width: int = 60) -> str:
+    paragraphs = text.splitlines()
+    wrapped: list[str] = []
+    for paragraph in paragraphs:
+        chunk = paragraph.strip()
+        if not chunk:
+            wrapped.append("")
+            continue
+        if "<" in chunk and ">" in chunk:
+            wrapped.append(chunk)
+            continue
+        wrapped.append("\n".join(textwrap.wrap(chunk, width=width, break_long_words=False, break_on_hyphens=False)) or chunk)
+    return "\n".join(wrapped).strip()
 

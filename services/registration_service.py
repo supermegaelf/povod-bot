@@ -1,13 +1,9 @@
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Optional
 
 from database.pool import get_pool
 
-from database.repositories.registrations import (
-    Participant,
-    RegistrationRepository,
-    RegistrationStats,
-)
+from database.repositories.registrations import RegistrationRepository, RegistrationStats
 from utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
@@ -27,15 +23,6 @@ class RegistrationService:
     def __init__(self, repository: RegistrationRepository) -> None:
         self._repository = repository
 
-    async def set_going(self, event_id: int, user_id: int) -> None:
-        await self._repository.upsert(event_id, user_id, STATUS_GOING)
-
-    async def set_not_going(self, event_id: int, user_id: int) -> None:
-        await self._repository.upsert(event_id, user_id, STATUS_NOT_GOING)
-
-    async def get_user_status(self, event_id: int, user_id: int) -> Optional[str]:
-        return await self._repository.get_status(event_id, user_id)
-
     async def get_stats(self, event_id: int) -> RegistrationStats:
         return await self._repository.get_stats(event_id)
 
@@ -44,9 +31,6 @@ class RegistrationService:
 
     async def list_participant_telegram_ids(self, event_id: int, status: str = STATUS_GOING) -> list[int]:
         return await self._repository.list_participant_telegram_ids(event_id, status)
-
-    async def list_participants(self, event_id: int) -> Sequence[Participant]:
-        return await self._repository.list_participants(event_id)
 
 
 def build_registration_service() -> RegistrationService:

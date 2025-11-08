@@ -3,7 +3,8 @@ from aiogram.fsm.state import State, StatesGroup
 
 class CreateEventState(StatesGroup):
     title = State()
-    datetime = State()
+    date = State()
+    time = State()
     place = State()
     description = State()
     cost = State()
@@ -18,8 +19,4 @@ class EditEventState(StatesGroup):
     value_input = State()
     reminders = State()
     confirmation = State()
-
-
-class DiscussionState(StatesGroup):
-    writing = State()
 

@@ -7,12 +7,6 @@ SETTINGS_CREATE_EVENT = "settings:create"
 SETTINGS_MANAGE_EVENTS = "settings:manage"
 
 EVENT_VIEW_PREFIX = "event:view:"
-EVENT_GOING_PREFIX = "event:going:"
-EVENT_NOT_GOING_PREFIX = "event:notgoing:"
-EVENT_DISCUSSION_PREFIX = "event:discussion:view:"
-EVENT_DISCUSSION_WRITE_PREFIX = "event:discussion:write:"
-EVENT_DISCUSSION_CANCEL_PREFIX = "event:discussion:cancel:"
-EVENT_PARTICIPANTS_PREFIX = "event:participants:"
 EVENT_PAYMENT_PREFIX = "event:payment:"
 EVENT_BACK_TO_LIST = "event:back:list"
 
@@ -22,6 +16,7 @@ CREATE_EVENT_PUBLISH = "create:publish"
 CREATE_EVENT_REMINDER_TOGGLE_3 = "create:reminder:3"
 CREATE_EVENT_REMINDER_TOGGLE_1 = "create:reminder:1"
 CREATE_EVENT_REMINDER_DONE = "create:reminder:done"
+CREATE_EVENT_SKIP = "create:skip"
 
 EDIT_EVENT_PREFIX = "edit:event:"
 EDIT_EVENT_FIELD_PREFIX = "edit:field:"
@@ -34,30 +29,6 @@ EDIT_EVENT_CONFIRM_CANCEL_PREFIX = "edit:confirm_cancel:"
 
 def event_view(event_id: int) -> str:
     return f"{EVENT_VIEW_PREFIX}{event_id}"
-
-
-def event_going(event_id: int) -> str:
-    return f"{EVENT_GOING_PREFIX}{event_id}"
-
-
-def event_not_going(event_id: int) -> str:
-    return f"{EVENT_NOT_GOING_PREFIX}{event_id}"
-
-
-def event_discussion(event_id: int) -> str:
-    return f"{EVENT_DISCUSSION_PREFIX}{event_id}"
-
-
-def event_discussion_write(event_id: int) -> str:
-    return f"{EVENT_DISCUSSION_WRITE_PREFIX}{event_id}"
-
-
-def event_discussion_cancel(event_id: int) -> str:
-    return f"{EVENT_DISCUSSION_CANCEL_PREFIX}{event_id}"
-
-
-def event_participants(event_id: int) -> str:
-    return f"{EVENT_PARTICIPANTS_PREFIX}{event_id}"
 
 
 def event_payment(event_id: int) -> str:
