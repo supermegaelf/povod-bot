@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from database.repositories.events import Event
-from database.repositories.registrations import RegistrationStats
 from services.registration_service import Availability
 from utils.i18n import t
 
@@ -24,7 +23,7 @@ def format_event_summary(event: Event) -> str:
     return "\n".join(lines)
 
 
-def format_event_card(event: Event, stats: RegistrationStats, availability: Availability) -> str:
+def format_event_card(event: Event, availability: Availability | None = None) -> str:
     event_datetime = datetime.combine(event.date, event.time)
     date_str = event_datetime.strftime(t("format.display_date"))
     time_str = event_datetime.strftime(t("format.display_time"))
@@ -43,18 +42,16 @@ def format_event_card(event: Event, stats: RegistrationStats, availability: Avai
     else:
         lines.append("")
         lines.append(t("event.card.cost_free"))
-    if availability.capacity is None:
-        lines.append(t("event.card.capacity_unlimited"))
-    else:
-        lines.append(
-            t(
-                "event.card.capacity",
-                free=availability.free,
-                capacity=availability.capacity,
+    if availability is not None:
+        if availability.capacity is None:
+            lines.append(t("event.card.capacity_unlimited"))
+        else:
+            lines.append(
+                t(
+                    "event.card.capacity",
+                    free=availability.free,
+                    capacity=availability.capacity,
+                )
             )
-        )
-    lines.append("")
-    lines.append(t("event.card.going", count=stats.going))
-    lines.append(t("event.card.not_going", count=stats.not_going))
     return "\n".join(lines)
 

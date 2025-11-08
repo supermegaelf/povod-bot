@@ -17,5 +17,9 @@ def build_services(config: Config) -> ServiceContainer:
     users = build_user_service(config.bot.admin_ids)
     events = build_event_service()
     registrations = build_registration_service()
-    return ServiceContainer(users=users, events=events, registrations=registrations)
+    return ServiceContainer(
+        users=users,
+        events=events,
+        registrations=registrations,
+    )
 

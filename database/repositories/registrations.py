@@ -16,22 +16,6 @@ class RegistrationRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
-    async def upsert(self, event_id: int, user_id: int, status: str) -> None:
-        query = """
-        INSERT INTO registrations (event_id, user_id, status)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (event_id, user_id)
-        DO UPDATE SET status = EXCLUDED.status, registered_at = NOW()
-        """
-        await self._pool.execute(query, event_id, user_id, status)
-
-    async def get_status(self, event_id: int, user_id: int) -> Optional[str]:
-        query = "SELECT status FROM registrations WHERE event_id = $1 AND user_id = $2"
-        record = await self._pool.fetchrow(query, event_id, user_id)
-        if record is None:
-            return None
-        return record["status"]
-
     async def get_stats(self, event_id: int) -> RegistrationStats:
         query = """
         SELECT

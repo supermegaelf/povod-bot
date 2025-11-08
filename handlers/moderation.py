@@ -635,7 +635,7 @@ async def _notify_new_event(callback: CallbackQuery, event: Event) -> None:
     bot = callback.message.bot if callback.message else callback.bot
     stats = RegistrationStats(going=0, not_going=0)
     availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, stats, availability)
+    text = format_event_card(event, availability)
     telegram_ids = await services.users.list_all_telegram_ids()
     for telegram_id in telegram_ids:
         try:
@@ -653,7 +653,7 @@ async def _notify_event_update(message: Message, event: Event, notice: str) -> N
     bot = message.bot
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, stats, availability)
+    text = format_event_card(event, availability)
     telegram_ids = await services.registrations.list_participant_telegram_ids(event.id)
     for telegram_id in telegram_ids:
         try:
@@ -772,7 +772,7 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
     )
     stats = RegistrationStats(going=0, not_going=0)
     availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, stats, availability)
+    text = format_event_card(event, availability)
     markup = create_preview_keyboard()
     if event.image_file_id:
         await _send_prompt_photo(message, state, event.image_file_id, text, markup)
