@@ -1,8 +1,13 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 from database.pool import get_pool
-from database.repositories.registrations import RegistrationRepository, RegistrationStats
+
+from database.repositories.registrations import (
+    Participant,
+    RegistrationRepository,
+    RegistrationStats,
+)
 from utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
@@ -39,6 +44,9 @@ class RegistrationService:
 
     async def list_participant_telegram_ids(self, event_id: int, status: str = STATUS_GOING) -> list[int]:
         return await self._repository.list_participant_telegram_ids(event_id, status)
+
+    async def list_participants(self, event_id: int) -> Sequence[Participant]:
+        return await self._repository.list_participants(event_id)
 
 
 def build_registration_service() -> RegistrationService:

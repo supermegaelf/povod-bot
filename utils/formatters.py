@@ -1,9 +1,13 @@
 from datetime import datetime
 
+from typing import Sequence
+
+from database.repositories.discussions import DiscussionMessage
 from database.repositories.events import Event
-from database.repositories.registrations import RegistrationStats
+from database.repositories.registrations import Participant, RegistrationStats
 from services.registration_service import Availability
 from utils.i18n import t
+from utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
 def format_event_summary(event: Event) -> str:
@@ -56,5 +60,47 @@ def format_event_card(event: Event, stats: RegistrationStats, availability: Avai
     lines.append("")
     lines.append(t("event.card.going", count=stats.going))
     lines.append(t("event.card.not_going", count=stats.not_going))
+    return "\n".join(lines)
+
+
+def format_discussion(messages: Sequence[DiscussionMessage], event_title: str) -> str:
+    if not messages:
+        return t("discussion.empty", title=event_title)
+    lines: list[str] = [t("discussion.header", title=event_title)]
+    for message in reversed(messages):
+        author = message.username or t("discussion.anonymous", id=message.user_id)
+        timestamp = message.created_at.strftime(t("format.display_datetime"))
+        lines.append("")
+        lines.append(f"<b>{author}</b> — {timestamp}")
+        lines.append(message.message)
+    return "\n".join(lines)
+
+
+def format_participants(participants: Sequence[Participant], event_title: str) -> str:
+    if not participants:
+        return t("participants.empty", title=event_title)
+    going: list[str] = []
+    not_going: list[str] = []
+    for participant in participants:
+        name = participant.username or t("participants.anonymous", id=participant.user_id)
+        line = f"- {name}"
+        if participant.status == STATUS_GOING:
+            going.append(line)
+        elif participant.status == STATUS_NOT_GOING:
+            not_going.append(line)
+        else:
+            going.append(line)
+
+    sections: list[tuple[str, list[str]]] = []
+    if going:
+        sections.append((t("participants.going"), going))
+    if not_going:
+        sections.append((t("participants.not_going"), not_going))
+
+    lines: list[str] = [t("participants.header", title=event_title)]
+    for title, names in sections:
+        lines.append("")
+        lines.append(f"<b>{title}</b>")
+        lines.extend(names)
     return "\n".join(lines)
 
