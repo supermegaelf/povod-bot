@@ -30,13 +30,14 @@ from utils.callbacks import (
     CREATE_EVENT_REMINDER_DONE,
     CREATE_EVENT_REMINDER_TOGGLE_1,
     CREATE_EVENT_REMINDER_TOGGLE_3,
+    CREATE_EVENT_SKIP,
+    EDIT_EVENT_BACK,
+    EDIT_EVENT_CANCEL,
+    EDIT_EVENT_SAVE,
     EDIT_EVENT_CANCEL_EVENT_PREFIX,
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
     EDIT_EVENT_FIELD_PREFIX,
     EDIT_EVENT_PREFIX,
-    EDIT_EVENT_BACK,
-    EDIT_EVENT_CANCEL,
-    EDIT_EVENT_SAVE,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     extract_event_id,
@@ -50,11 +51,15 @@ from utils.i18n import t
 router = Router()
 
 PROMPT_KEY = "prompt_message_id"
+PROMPT_CHAT_KEY = "prompt_chat_id"
+NOTICE_KEY = "notice_message_id"
+NOTICE_CHAT_KEY = "notice_chat_id"
 
 
 CREATE_STATE_SEQUENCE = [
     CreateEventState.title,
-    CreateEventState.datetime,
+    CreateEventState.date,
+    CreateEventState.time,
     CreateEventState.place,
     CreateEventState.description,
     CreateEventState.cost,
@@ -121,6 +126,76 @@ async def create_event_cancel(callback: CallbackQuery, state: FSMContext) -> Non
     await callback.answer()
 
 
+@router.callback_query(F.data == CREATE_EVENT_SKIP)
+async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state is None:
+        await callback.answer()
+        return
+    if current_state == CreateEventState.time.state:
+        await _push_create_history(state, CreateEventState.time)
+        await state.update_data(event_time=None)
+        await state.set_state(CreateEventState.place)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.place_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.place.state:
+        await _push_create_history(state, CreateEventState.place)
+        await state.update_data(place=None)
+        await state.set_state(CreateEventState.description)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.description_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.description.state:
+        await _push_create_history(state, CreateEventState.description)
+        await state.update_data(description=None)
+        await state.set_state(CreateEventState.cost)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.cost_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.cost.state:
+        await _push_create_history(state, CreateEventState.cost)
+        await state.update_data(cost=None)
+        await state.set_state(CreateEventState.image)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.image_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.image.state:
+        await _push_create_history(state, CreateEventState.image)
+        await state.update_data(image_file_id=None)
+        await state.set_state(CreateEventState.limit)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.limit_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.limit.state:
+        await _push_create_history(state, CreateEventState.limit)
+        await state.update_data(limit=None)
+        await state.set_state(CreateEventState.reminders)
+        if callback.message:
+            await _prompt_reminders(callback.message, state)
+    await callback.answer()
+
+
 @router.message(CreateEventState.title)
 async def process_create_title(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
@@ -135,38 +210,77 @@ async def process_create_title(message: Message, state: FSMContext) -> None:
         return
     await _push_create_history(state, CreateEventState.title)
     await state.update_data(title=text)
-    await state.set_state(CreateEventState.datetime)
+    await state.set_state(CreateEventState.date)
     await _send_prompt_text(
         message,
         state,
-        t("create.datetime_prompt"),
+        t("create.date_prompt"),
         create_step_keyboard(back_enabled=True),
     )
     await safe_delete(message)
 
 
-@router.message(CreateEventState.datetime)
-async def process_create_datetime(message: Message, state: FSMContext) -> None:
+@router.message(CreateEventState.date)
+async def process_create_date(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     try:
-        combined = datetime.strptime(text, t("format.input_datetime"))
+        parsed_date = datetime.strptime(text, t("format.input_date")).date()
     except ValueError:
         await _send_prompt_text(
             message,
             state,
-            t("create.datetime_invalid"),
+            t("create.date_invalid"),
             create_step_keyboard(back_enabled=True),
         )
         await safe_delete(message)
         return
-    await _push_create_history(state, CreateEventState.datetime)
-    await state.update_data(event_date=combined.date(), event_time=combined.time())
+    await _push_create_history(state, CreateEventState.date)
+    await state.update_data(event_date=parsed_date, event_time=None)
+    await state.set_state(CreateEventState.time)
+    await _send_prompt_text(
+        message,
+        state,
+        t("create.time_prompt"),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
+    )
+    await safe_delete(message)
+
+
+@router.message(CreateEventState.time)
+async def process_create_time(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    lowered = text.lower()
+    if not text or lowered in {"пропустить", "skip"}:
+        await _push_create_history(state, CreateEventState.time)
+        await state.update_data(event_time=None)
+        await state.set_state(CreateEventState.place)
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.place_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    try:
+        parsed_time = datetime.strptime(text, t("format.input_time")).time()
+    except ValueError:
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.time_invalid"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    await _push_create_history(state, CreateEventState.time)
+    await state.update_data(event_time=parsed_time)
     await state.set_state(CreateEventState.place)
     await _send_prompt_text(
         message,
         state,
         t("create.place_prompt"),
-        create_step_keyboard(back_enabled=True),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
 
@@ -174,23 +288,18 @@ async def process_create_datetime(message: Message, state: FSMContext) -> None:
 @router.message(CreateEventState.place)
 async def process_create_place(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
-    if not text:
-        await _send_prompt_text(
-            message,
-            state,
-            t("create.place_empty"),
-            create_step_keyboard(back_enabled=True),
-        )
-        await safe_delete(message)
-        return
+    lowered = text.lower()
     await _push_create_history(state, CreateEventState.place)
-    await state.update_data(place=text)
+    if text and lowered not in {"пропустить", "skip"}:
+        await state.update_data(place=text)
+    else:
+        await state.update_data(place=None)
     await state.set_state(CreateEventState.description)
     await _send_prompt_text(
         message,
         state,
         t("create.description_prompt"),
-        create_step_keyboard(back_enabled=True),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
 
@@ -199,20 +308,36 @@ async def process_create_place(message: Message, state: FSMContext) -> None:
 async def process_create_description(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     await _push_create_history(state, CreateEventState.description)
-    await state.update_data(description=text if text else None)
+    if text and text.lower() not in {"пропустить", "skip"}:
+        await state.update_data(description=text)
+    else:
+        await state.update_data(description=None)
     await state.set_state(CreateEventState.cost)
     await _send_prompt_text(
         message,
         state,
         t("create.cost_prompt"),
-        create_step_keyboard(back_enabled=True),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
 
 
 @router.message(CreateEventState.cost)
 async def process_create_cost(message: Message, state: FSMContext) -> None:
-    text = (message.text or "0").replace(" ", "").replace(",", ".")
+    raw_text = (message.text or "").strip()
+    if not raw_text or raw_text.lower() in {"пропустить", "skip"}:
+        await _push_create_history(state, CreateEventState.cost)
+        await state.update_data(cost=None)
+        await state.set_state(CreateEventState.image)
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.image_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    text = raw_text.replace(" ", "").replace(",", ".")
     try:
         cost = Decimal(text)
         if cost < 0:
@@ -222,7 +347,7 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
             message,
             state,
             t("create.cost_invalid"),
-            create_step_keyboard(back_enabled=True),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
         )
         await safe_delete(message)
         return
@@ -233,7 +358,7 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
         message,
         state,
         t("create.image_prompt"),
-        create_step_keyboard(back_enabled=True),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
 
@@ -250,7 +375,7 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
                 message,
                 state,
                 t("create.image_invalid"),
-                create_step_keyboard(back_enabled=True),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
             )
             await safe_delete(message)
             return
@@ -261,14 +386,21 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
         message,
         state,
         t("create.limit_prompt"),
-        create_step_keyboard(back_enabled=True),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
 
 
 @router.message(CreateEventState.limit)
 async def process_create_limit(message: Message, state: FSMContext) -> None:
-    text = (message.text or "0").strip()
+    text = (message.text or "").strip()
+    if not text or text.lower() in {"пропустить", "skip"}:
+        await _push_create_history(state, CreateEventState.limit)
+        await state.update_data(limit=None)
+        await state.set_state(CreateEventState.reminders)
+        await _prompt_reminders(message, state)
+        await safe_delete(message)
+        return
     try:
         value = int(text)
     except ValueError:
@@ -276,7 +408,7 @@ async def process_create_limit(message: Message, state: FSMContext) -> None:
             message,
             state,
             t("create.limit_invalid"),
-            create_step_keyboard(back_enabled=True),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
         )
         await safe_delete(message)
         return
@@ -317,11 +449,8 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
     payload = _build_event_payload(data)
     event = await services.events.create_event(payload)
     await _notify_new_event(callback, event)
-    prompt_id = data.get(PROMPT_KEY)
-    if prompt_id and callback.message:
-        await safe_delete_message(callback.bot, callback.message.chat.id, prompt_id)
-        await state.update_data(**{PROMPT_KEY: None})
     if callback.message:
+        await _remove_prompt_message(callback.message, state)
         await safe_delete(callback.message)
         await callback.message.answer(t("create.published"), reply_markup=moderator_settings_keyboard())
     await state.clear()
@@ -414,6 +543,7 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
     await state.update_data(edit_event_id=event_id, edit_stack=["actions"])
     await state.set_state(EditEventState.selecting_field)
     if callback.message:
+        await _clear_notice_message(state, callback.message.bot)
         await _remove_prompt_message(callback.message, state)
         await safe_delete(callback.message)
         await _send_prompt_text(
@@ -431,6 +561,7 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
     stack = list(data.get("edit_stack", []))
     if not stack:
         if callback.message:
+            await _clear_notice_message(state, callback.message.bot)
             await _remove_prompt_message(callback.message, state)
             await safe_delete(callback.message)
             await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
@@ -444,6 +575,8 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         await callback.answer()
         return
+    if callback.message:
+        await _clear_notice_message(state, callback.message.bot)
     current = stack[-1] if stack else None
     if current == "fields":
         if callback.message:
@@ -458,13 +591,8 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
     elif current == "actions" or current is None:
         if callback.message:
             await safe_delete(callback.message)
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("edit.event_options_prompt"),
-                manage_event_actions_keyboard(event_id),
-            )
-        await state.set_state(EditEventState.selecting_field)
+            await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
+        await state.clear()
     else:
         if callback.message:
             await safe_delete(callback.message)
@@ -482,6 +610,7 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
 async def edit_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     if callback.message:
+        await _clear_notice_message(state, callback.message.bot)
         await _remove_prompt_message(callback.message, state)
         await safe_delete(callback.message)
         await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
@@ -520,7 +649,7 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         await state.clear()
         return
-    await _notify_event_update(message, event, t("notify.event_update_notice", field=field))
+    await _notify_event_update(message, state, event, t("notify.event_update_notice", field=_field_label(field)))
     await state.update_data(edit_stack=["actions"], edit_field=None)
     await state.set_state(EditEventState.selecting_field)
     await _send_prompt_text(
@@ -552,7 +681,7 @@ async def save_edit_reminders(callback: CallbackQuery, state: FSMContext) -> Non
     if callback.message:
         await _remove_prompt_message(callback.message, state)
         await safe_delete(callback.message)
-        await _notify_event_update(callback.message, event, t("edit.reminders_saved"))
+        await _notify_event_update(callback.message, state, event, t("edit.reminders_saved"))
         await _send_prompt_text(
             callback.message,
             state,
@@ -604,40 +733,61 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
     await callback.answer()
 
 
-async def _remove_prompt_message(message: Message, state: FSMContext) -> None:
+async def _clear_notice_message(state: FSMContext, bot) -> None:
+    data = await state.get_data()
+    notice_id = data.get(NOTICE_KEY)
+    notice_chat = data.get(NOTICE_CHAT_KEY)
+    if notice_id and notice_chat and bot:
+        await safe_delete_message(bot, notice_chat, notice_id)
+    await state.update_data(**{NOTICE_KEY: None, NOTICE_CHAT_KEY: None})
+
+
+async def _remove_prompt_message(message: Message | None, state: FSMContext) -> None:
     data = await state.get_data()
     prompt_id = data.get(PROMPT_KEY)
-    if prompt_id:
-        await safe_delete_message(message.bot, message.chat.id, prompt_id)
-        await state.update_data(**{PROMPT_KEY: None})
+    prompt_chat = data.get(PROMPT_CHAT_KEY)
+    bot = message.bot if message else None
+    chat_id = message.chat.id if message else None
+    target_chat = prompt_chat or chat_id
+    if prompt_id and target_chat and bot:
+        await safe_delete_message(bot, target_chat, prompt_id)
+    await state.update_data(**{PROMPT_KEY: None, PROMPT_CHAT_KEY: None})
 
 
-async def _set_prompt_message(state: FSMContext, message_id: int | None) -> None:
-    await state.update_data(**{PROMPT_KEY: message_id})
+async def _set_prompt_message(state: FSMContext, message: Message | None) -> None:
+    await state.update_data(
+        **{
+            PROMPT_KEY: message.message_id if message else None,
+            PROMPT_CHAT_KEY: message.chat.id if message else None,
+        }
+    )
 
 
 async def _send_prompt_text(message: Message, state: FSMContext, text: str, reply_markup) -> Message:
     await _remove_prompt_message(message, state)
     sent = await message.answer(text, reply_markup=reply_markup)
-    await _set_prompt_message(state, sent.message_id)
+    await _set_prompt_message(state, sent)
     return sent
 
 
 async def _send_prompt_photo(message: Message, state: FSMContext, photo: str, caption: str, reply_markup) -> Message:
     await _remove_prompt_message(message, state)
     sent = await message.answer_photo(photo, caption=caption, reply_markup=reply_markup)
-    await _set_prompt_message(state, sent.message_id)
+    await _set_prompt_message(state, sent)
     return sent
 
 
 async def _notify_new_event(callback: CallbackQuery, event: Event) -> None:
     services = get_services()
     bot = callback.message.bot if callback.message else callback.bot
+    creator_id = callback.from_user.id if callback.from_user else None
     stats = RegistrationStats(going=0, not_going=0)
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
     telegram_ids = await services.users.list_all_telegram_ids()
     for telegram_id in telegram_ids:
+        if creator_id and telegram_id == creator_id:
+            continue
         try:
             if event.image_file_id:
                 await bot.send_photo(telegram_id, event.image_file_id, caption=text)
@@ -647,27 +797,22 @@ async def _notify_new_event(callback: CallbackQuery, event: Event) -> None:
             continue
 
 
-async def _notify_event_update(message: Message, event: Event, notice: str) -> None:
+async def _notify_event_update(message: Message, state: FSMContext, event: Event, notice: str) -> None:
+    await _clear_notice_message(state, message.bot)
+    notice_message = await message.answer(notice)
+    await state.update_data(
+        **{
+            NOTICE_KEY: notice_message.message_id,
+            NOTICE_CHAT_KEY: notice_message.chat.id,
+        }
+    )
     services = get_services()
-    await message.answer(notice)
     bot = message.bot
-    stats = await services.registrations.get_stats(event.id)
-    availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, availability)
     telegram_ids = await services.registrations.list_participant_telegram_ids(event.id)
+    broadcast_text = t("notify.event_update_broadcast", details=notice)
     for telegram_id in telegram_ids:
         try:
-            if event.image_file_id:
-                await bot.send_photo(
-                    telegram_id,
-                    event.image_file_id,
-                    caption=t("notify.event_update_broadcast", details=text),
-                )
-            else:
-                await bot.send_message(
-                    telegram_id,
-                    t("notify.event_update_broadcast", details=text),
-                )
+            await bot.send_message(telegram_id, broadcast_text)
         except Exception:
             continue
 
@@ -687,18 +832,50 @@ async def _notify_cancellation(callback: CallbackQuery, event: Event) -> None:
 async def _prompt_create_state(message: Message, state: FSMContext, target_state: Any) -> None:
     if target_state == CreateEventState.title:
         await _send_prompt_text(message, state, t("create.title_prompt"), create_step_keyboard(back_enabled=True))
-    elif target_state == CreateEventState.datetime:
-        await _send_prompt_text(message, state, t("create.datetime_prompt"), create_step_keyboard(back_enabled=True))
+    elif target_state == CreateEventState.date:
+        await _send_prompt_text(message, state, t("create.date_prompt"), create_step_keyboard(back_enabled=True))
+    elif target_state == CreateEventState.time:
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.time_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.place:
-        await _send_prompt_text(message, state, t("create.place_prompt"), create_step_keyboard(back_enabled=True))
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.place_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.description:
-        await _send_prompt_text(message, state, t("create.description_prompt"), create_step_keyboard(back_enabled=True))
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.description_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.cost:
-        await _send_prompt_text(message, state, t("create.cost_prompt"), create_step_keyboard(back_enabled=True))
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.cost_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.image:
-        await _send_prompt_text(message, state, t("create.image_prompt"), create_step_keyboard(back_enabled=True))
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.image_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.limit:
-        await _send_prompt_text(message, state, t("create.limit_prompt"), create_step_keyboard(back_enabled=True))
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.limit_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.reminders:
         await _prompt_reminders(message, state)
     elif target_state == CreateEventState.preview:
@@ -756,14 +933,15 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
     services = get_services()
     data = await state.get_data()
     payload = _build_event_payload(data)
+    cost_value = payload.get("cost")
     event = Event(
         id=0,
         title=payload["title"],
         date=payload["date"],
         time=payload["time"],
-        place=payload["place"],
+        place=payload.get("place"),
         description=payload.get("description"),
-        cost=float(payload.get("cost", Decimal("0"))),
+        cost=float(cost_value) if cost_value is not None else None,
         image_file_id=payload.get("image_file_id"),
         max_participants=payload.get("max_participants"),
         reminder_3days=payload.get("reminder_3days", False),
@@ -787,7 +965,7 @@ def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
         "time": data.get("event_time"),
         "place": data.get("place"),
         "description": data.get("description"),
-        "cost": data.get("cost", Decimal("0")),
+        "cost": data.get("cost"),
         "image_file_id": data.get("image_file_id"),
         "max_participants": data.get("limit"),
         "reminder_3days": data.get("reminder_3days", False),
@@ -826,7 +1004,8 @@ async def _prompt_edit_reminders(message: Message, state: FSMContext, event_id: 
 def _edit_prompt_for(field: str) -> str:
     prompts = {
         "title": t("edit.prompt_title"),
-        "datetime": t("edit.prompt_datetime"),
+        "date": t("edit.prompt_date"),
+        "time": t("edit.prompt_time"),
         "place": t("edit.prompt_place"),
         "description": t("edit.prompt_description"),
         "cost": t("edit.prompt_cost"),
@@ -836,16 +1015,39 @@ def _edit_prompt_for(field: str) -> str:
     return prompts.get(field, t("edit.prompt_value_fallback"))
 
 
+def _field_label(field: str) -> str:
+    labels = {
+        "title": t("button.field.title"),
+        "date": t("button.field.date"),
+        "time": t("button.field.time"),
+        "place": t("button.field.place"),
+        "description": t("button.field.description"),
+        "cost": t("button.field.cost"),
+        "image": t("button.field.image"),
+        "limit": t("button.field.limit"),
+        "reminders": t("button.field.reminders"),
+    }
+    return labels.get(field, field)
+
+
 def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
-    if field == "title" or field == "place":
+    if field == "title":
         value = (message.text or "").strip()
         if not value:
             raise ValueError(t("edit.value_empty_error"))
         return {field: value}
+    if field == "place":
+        value = (message.text or "").strip()
+        if not value or value.lower() in {"пропустить", "skip"}:
+            return {"place": None}
+        return {"place": value}
     if field == "description":
         return {field: (message.text or "").strip() or None}
     if field == "cost":
-        text = (message.text or "0").replace(" ", "").replace(",", ".")
+        raw_text = (message.text or "").strip()
+        if not raw_text or raw_text.lower() in {"пропустить", "skip"}:
+            return {"cost": None}
+        text = raw_text.replace(" ", "").replace(",", ".")
         try:
             cost = Decimal(text)
             if cost < 0:
@@ -854,19 +1056,31 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
             raise ValueError(t("edit.cost_invalid_error"))
         return {field: cost}
     if field == "limit":
-        text = (message.text or "0").strip()
+        text = (message.text or "").strip()
+        if not text or text.lower() in {"пропустить", "skip"}:
+            return {"max_participants": None}
         try:
             value = int(text)
         except ValueError as error:
             raise ValueError(t("edit.limit_invalid_error")) from error
         return {"max_participants": value if value > 0 else None}
-    if field == "datetime":
+    if field == "date":
         text = (message.text or "").strip()
         try:
-            combined = datetime.strptime(text, t("format.input_datetime"))
+            parsed_date = datetime.strptime(text, t("format.input_date")).date()
         except ValueError as error:
-            raise ValueError(t("edit.datetime_invalid_error")) from error
-        return {"date": combined.date(), "time": combined.time()}
+            raise ValueError(t("edit.date_invalid_error")) from error
+        return {"date": parsed_date}
+    if field == "time":
+        text = (message.text or "").strip()
+        lowered = text.lower()
+        if not text or lowered in {"пропустить", "skip"}:
+            return {"time": None}
+        try:
+            parsed_time = datetime.strptime(text, t("format.input_time")).time()
+        except ValueError as error:
+            raise ValueError(t("edit.time_invalid_error")) from error
+        return {"time": parsed_time}
     if field == "image":
         if not message.photo:
             raise ValueError(t("edit.image_required_error"))

@@ -16,6 +16,7 @@ CREATE_EVENT_PUBLISH = "create:publish"
 CREATE_EVENT_REMINDER_TOGGLE_3 = "create:reminder:3"
 CREATE_EVENT_REMINDER_TOGGLE_1 = "create:reminder:1"
 CREATE_EVENT_REMINDER_DONE = "create:reminder:done"
+CREATE_EVENT_SKIP = "create:skip"
 
 EDIT_EVENT_PREFIX = "edit:event:"
 EDIT_EVENT_FIELD_PREFIX = "edit:field:"
