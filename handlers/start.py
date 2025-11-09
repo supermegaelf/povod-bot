@@ -1,3 +1,5 @@
+from html import escape
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
@@ -18,7 +20,9 @@ async def handle_start(message: Message) -> None:
     if tg_user is None:
         return
     await services.users.ensure(tg_user.id, tg_user.username)
-    await message.answer(t("start.welcome"), reply_markup=start_keyboard())
+    raw_name = (tg_user.full_name or tg_user.username or "").strip()
+    display_name = escape(raw_name) if raw_name else t("start.fallback_name")
+    await message.answer(t("start.welcome", name=display_name), reply_markup=start_keyboard())
 
 
 @router.callback_query(F.data == START_MAIN_MENU)
