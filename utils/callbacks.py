@@ -1,7 +1,6 @@
 START_MAIN_MENU = "main:start"
 MENU_ACTUAL_EVENTS = "menu:actual"
-MENU_HISTORY = "menu:history"
-MENU_STATS = "menu:stats"
+MENU_COMMUNITY = "menu:community"
 MENU_SETTINGS = "menu:settings"
 SETTINGS_CREATE_EVENT = "settings:create"
 SETTINGS_MANAGE_EVENTS = "settings:manage"
