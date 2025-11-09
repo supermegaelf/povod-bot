@@ -3,6 +3,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from utils.callbacks import (
     CREATE_EVENT_BACK,
     CREATE_EVENT_CANCEL,
+    CREATE_EVENT_SKIP,
     CREATE_EVENT_PUBLISH,
     CREATE_EVENT_REMINDER_DONE,
     CREATE_EVENT_REMINDER_TOGGLE_1,
@@ -30,8 +31,10 @@ def moderator_settings_keyboard():
     return builder.as_markup()
 
 
-def create_step_keyboard(back_enabled: bool):
+def create_step_keyboard(back_enabled: bool, skip_enabled: bool = False):
     builder = InlineKeyboardBuilder()
+    if skip_enabled:
+        builder.button(text=t("button.skip"), callback_data=CREATE_EVENT_SKIP)
     if back_enabled:
         builder.button(text=t("button.back"), callback_data=CREATE_EVENT_BACK)
     builder.adjust(1)
@@ -87,7 +90,8 @@ def manage_event_actions_keyboard(event_id: int):
 def edit_field_choice_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.field.title"), callback_data=edit_event_field(event_id, "title"))
-    builder.button(text=t("button.field.datetime"), callback_data=edit_event_field(event_id, "datetime"))
+    builder.button(text=t("button.field.date"), callback_data=edit_event_field(event_id, "date"))
+    builder.button(text=t("button.field.time"), callback_data=edit_event_field(event_id, "time"))
     builder.button(text=t("button.field.place"), callback_data=edit_event_field(event_id, "place"))
     builder.button(text=t("button.field.description"), callback_data=edit_event_field(event_id, "description"))
     builder.button(text=t("button.field.cost"), callback_data=edit_event_field(event_id, "cost"))

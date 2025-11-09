@@ -10,10 +10,10 @@ class Event:
     id: int
     title: str
     date: date
-    time: time
-    place: str
+    time: Optional[time]
+    place: Optional[str]
     description: Optional[str]
-    cost: float
+    cost: Optional[float]
     image_file_id: Optional[str]
     max_participants: Optional[int]
     reminder_3days: bool
@@ -74,9 +74,9 @@ class EventRepository:
             data["title"],
             data["date"],
             data["time"],
-            data["place"],
+            data.get("place"),
             data.get("description"),
-            data.get("cost", 0),
+            data.get("cost"),
             data.get("image_file_id"),
             data.get("max_participants"),
             data.get("reminder_3days", False),
@@ -115,7 +115,7 @@ class EventRepository:
             time=record["time"],
             place=record["place"],
             description=record["description"],
-            cost=float(record["cost"]) if record["cost"] is not None else 0.0,
+            cost=float(record["cost"]) if record["cost"] is not None else None,
             image_file_id=record["image_file_id"],
             max_participants=record["max_participants"],
             reminder_3days=record["reminder_3days"],
