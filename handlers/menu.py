@@ -1,14 +1,9 @@
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from keyboards import (
-    back_to_main_keyboard,
-    event_list_keyboard,
-    moderator_settings_keyboard,
-)
-from utils.callbacks import MENU_ACTUAL_EVENTS, MENU_HISTORY, MENU_SETTINGS, MENU_STATS
+from keyboards import back_to_main_keyboard, event_list_keyboard, moderator_settings_keyboard
+from utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS
 from utils.di import get_services
-from utils.formatters import format_event_summary
 from utils.i18n import t
 from utils.messaging import safe_delete
 
@@ -34,31 +29,14 @@ async def show_actual_events(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data == MENU_HISTORY)
-async def show_history(callback: CallbackQuery) -> None:
-    services = get_services()
-    tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
-    events = await services.events.get_history()
-    if not events:
-        text = t("history.empty")
-    else:
-        items = [format_event_summary(event) for event in events]
-        text = "\n\n".join(items)
-    if callback.message:
-        await safe_delete(callback.message)
-        await callback.message.answer(text, reply_markup=back_to_main_keyboard())
-    await callback.answer()
-
-
-@router.callback_query(F.data == MENU_STATS)
-async def show_stats(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == MENU_COMMUNITY)
+async def show_community(callback: CallbackQuery) -> None:
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username)
     if callback.message:
         await safe_delete(callback.message)
-        await callback.message.answer(t("statistics.placeholder"), reply_markup=back_to_main_keyboard())
+        await callback.message.answer(t("placeholder.community"), reply_markup=back_to_main_keyboard())
     await callback.answer()
 
 

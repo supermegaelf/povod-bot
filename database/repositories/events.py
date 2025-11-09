@@ -37,18 +37,6 @@ class EventRepository:
         records = await self._pool.fetch(query, limit)
         return [self._to_event(record) for record in records]
 
-    async def list_history(self, limit: int = 10) -> Sequence[Event]:
-        query = """
-        SELECT id, title, date, time, place, description, cost, image_file_id,
-               max_participants, reminder_3days, reminder_1day, status
-        FROM events
-        WHERE status IN ('completed', 'cancelled')
-        ORDER BY date DESC, time DESC
-        LIMIT $1
-        """
-        records = await self._pool.fetch(query, limit)
-        return [self._to_event(record) for record in records]
-
     async def get(self, event_id: int) -> Optional[Event]:
         query = """
         SELECT id, title, date, time, place, description, cost, image_file_id,

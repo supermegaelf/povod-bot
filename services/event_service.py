@@ -11,9 +11,6 @@ class EventService:
     async def get_active_events(self, limit: int = 5) -> Sequence[Event]:
         return await self._repository.list_active(limit)
 
-    async def get_history(self, limit: int = 10) -> Sequence[Event]:
-        return await self._repository.list_history(limit)
-
     async def get_event(self, event_id: int) -> Event | None:
         return await self._repository.get(event_id)
 
