@@ -5,8 +5,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 
 from database.repositories.events import Event
 from database.repositories.registrations import RegistrationStats
@@ -17,6 +18,7 @@ from keyboards import (
     create_reminders_keyboard,
     create_step_keyboard,
     edit_field_choice_keyboard,
+    edit_images_keyboard,
     edit_reminders_keyboard,
     edit_step_keyboard,
     manage_event_actions_keyboard,
@@ -26,6 +28,7 @@ from keyboards import (
 from utils.callbacks import (
     CREATE_EVENT_BACK,
     CREATE_EVENT_CANCEL,
+    CREATE_EVENT_IMAGES_CONFIRM,
     CREATE_EVENT_PUBLISH,
     CREATE_EVENT_REMINDER_DONE,
     CREATE_EVENT_REMINDER_TOGGLE_1,
@@ -45,7 +48,8 @@ from utils.callbacks import (
 )
 from utils.di import get_services
 from utils.formatters import format_event_card
-from utils.messaging import safe_delete, safe_delete_message
+from utils.constants import MAX_EVENT_IMAGES
+from utils.messaging import safe_delete, safe_delete_message, safe_delete_by_id
 from utils.i18n import t
 
 router = Router()
@@ -54,6 +58,7 @@ PROMPT_KEY = "prompt_message_id"
 PROMPT_CHAT_KEY = "prompt_chat_id"
 NOTICE_KEY = "notice_message_id"
 NOTICE_CHAT_KEY = "notice_chat_id"
+PREVIEW_MEDIA_KEY = "preview_media_entries"
 
 
 CREATE_STATE_SEQUENCE = [
@@ -81,7 +86,8 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     await state.clear()
-    await state.update_data(history=[])
+    await state.update_data(history=[], image_file_ids=[])
+    await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
     await state.set_state(CreateEventState.title)
     if callback.message:
         await safe_delete(callback.message)
@@ -98,6 +104,7 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
 async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     history = list(data.get("history", []))
+    await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
     if not history:
         await state.clear()
         if callback.message:
@@ -121,6 +128,7 @@ async def create_event_cancel(callback: CallbackQuery, state: FSMContext) -> Non
     if callback.message:
         await _remove_prompt_message(callback.message, state)
         await safe_delete(callback.message)
+        await _clear_preview_media(state, callback.message.bot)
         await callback.message.answer(t("create.cancelled"), reply_markup=moderator_settings_keyboard())
     await state.clear()
     await callback.answer()
@@ -170,15 +178,11 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(cost=None)
         await state.set_state(CreateEventState.image)
         if callback.message:
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("create.image_prompt"),
-                create_step_keyboard(back_enabled=True, skip_enabled=True),
-            )
+            await _render_create_image_prompt(callback.message, state)
     elif current_state == CreateEventState.image.state:
         await _push_create_history(state, CreateEventState.image)
-        await state.update_data(image_file_id=None)
+        data = await state.get_data()
+        await state.update_data(image_file_ids=data.get("image_file_ids", []))
         await state.set_state(CreateEventState.limit)
         if callback.message:
             await _send_prompt_text(
@@ -193,6 +197,26 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(CreateEventState.reminders)
         if callback.message:
             await _prompt_reminders(callback.message, state)
+    await callback.answer()
+
+
+@router.callback_query(F.data == CREATE_EVENT_IMAGES_CONFIRM)
+async def create_event_images_confirm(callback: CallbackQuery, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state != CreateEventState.image.state:
+        await callback.answer()
+        return
+    await _push_create_history(state, CreateEventState.image)
+    data = await state.get_data()
+    await state.update_data(image_file_ids=data.get("image_file_ids", []))
+    await state.set_state(CreateEventState.limit)
+    if callback.message:
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("create.limit_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     await callback.answer()
 
 
@@ -329,12 +353,7 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
         await _push_create_history(state, CreateEventState.cost)
         await state.update_data(cost=None)
         await state.set_state(CreateEventState.image)
-        await _send_prompt_text(
-            message,
-            state,
-            t("create.image_prompt"),
-            create_step_keyboard(back_enabled=True, skip_enabled=True),
-        )
+        await _render_create_image_prompt(message, state)
         await safe_delete(message)
         return
     text = raw_text.replace(" ", "").replace(",", ".")
@@ -354,39 +373,58 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
     await _push_create_history(state, CreateEventState.cost)
     await state.update_data(cost=cost)
     await state.set_state(CreateEventState.image)
-    await _send_prompt_text(
-        message,
-        state,
-        t("create.image_prompt"),
-        create_step_keyboard(back_enabled=True, skip_enabled=True),
-    )
+    await _render_create_image_prompt(message, state)
     await safe_delete(message)
 
 
 @router.message(CreateEventState.image)
 async def process_create_image(message: Message, state: FSMContext) -> None:
-    file_id: Optional[str] = None
+    data = await state.get_data()
+    images = list(data.get("image_file_ids", []))
     if message.photo:
-        file_id = message.photo[-1].file_id
-    else:
-        text = (message.text or "").strip().lower()
-        if text not in {"", "пропустить", "skip"}:
-            await _send_prompt_text(
+        if len(images) >= MAX_EVENT_IMAGES:
+            await _update_prompt_message(
                 message,
                 state,
-                t("create.image_invalid"),
-                create_step_keyboard(back_enabled=True, skip_enabled=True),
+                t("create.image_limit_reached", limit=MAX_EVENT_IMAGES),
+                create_step_keyboard(back_enabled=True, skip_enabled=True, confirm_enabled=True),
             )
             await safe_delete(message)
             return
-    await _push_create_history(state, CreateEventState.image)
-    await state.update_data(image_file_id=file_id)
-    await state.set_state(CreateEventState.limit)
-    await _send_prompt_text(
+        images.append(message.photo[-1].file_id)
+        await state.update_data(image_file_ids=images)
+        await _render_create_image_prompt(message, state)
+        await safe_delete(message)
+        return
+    text_raw = (message.text or "").strip()
+    lowered = text_raw.lower()
+    if (
+        lowered in {"", "пропустить", "skip"}
+        or lowered.startswith("подтвердить")
+        or lowered.startswith("confirm")
+    ):
+        await _push_create_history(state, CreateEventState.image)
+        await state.update_data(image_file_ids=images)
+        await state.set_state(CreateEventState.limit)
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.limit_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    if lowered in {"очистить", "clear"}:
+        images = []
+        await state.update_data(image_file_ids=images)
+        await _render_create_image_prompt(message, state)
+        await safe_delete(message)
+        return
+    await _update_prompt_message(
         message,
         state,
-        t("create.limit_prompt"),
-        create_step_keyboard(back_enabled=True, skip_enabled=True),
+        t("create.image_invalid"),
+        create_step_keyboard(back_enabled=True, skip_enabled=True, confirm_enabled=True),
     )
     await safe_delete(message)
 
@@ -437,6 +475,7 @@ async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
     await _push_create_history(state, CreateEventState.reminders)
     await state.set_state(CreateEventState.preview)
     if callback.message:
+        await _clear_preview_media(state, callback.message.bot)
         await _send_preview(callback.message, state)
         await safe_delete(callback.message)
     await callback.answer()
@@ -451,6 +490,7 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
     await _notify_new_event(callback, event)
     if callback.message:
         await _remove_prompt_message(callback.message, state)
+        await _clear_preview_media(state, callback.message.bot)
         await safe_delete(callback.message)
         await callback.message.answer(t("create.published"), reply_markup=moderator_settings_keyboard())
     await state.clear()
@@ -512,6 +552,18 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         if callback.message:
             await safe_delete(callback.message)
             await _prompt_edit_reminders(callback.message, state, event_id)
+        await callback.answer()
+        return
+    if field == "image":
+        services = get_services()
+        event = await services.events.get_event(event_id)
+        existing_images = list(event.image_file_ids) if event else []
+        await _push_edit_stack(state, "images")
+        await state.set_state(EditEventState.image_upload)
+        await state.update_data(edit_field=field, new_image_file_ids=existing_images)
+        if callback.message:
+            await safe_delete(callback.message)
+            await _render_edit_image_prompt(callback.message, state)
         await callback.answer()
         return
     await _push_edit_stack(state, "value")
@@ -588,6 +640,17 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
                 edit_field_choice_keyboard(event_id),
             )
         await state.set_state(EditEventState.selecting_field)
+    elif current == "images":
+        if callback.message:
+            await safe_delete(callback.message)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("edit.field_choice_prompt"),
+                edit_field_choice_keyboard(event_id),
+            )
+        await state.update_data(new_image_file_ids=[])
+        await state.set_state(EditEventState.selecting_field)
     elif current == "actions" or current is None:
         if callback.message:
             await safe_delete(callback.message)
@@ -661,35 +724,105 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
     await safe_delete(message)
 
 
+@router.message(EditEventState.image_upload)
+async def process_edit_images(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    images = list(data.get("new_image_file_ids", []))
+    if message.photo:
+        if len(images) >= MAX_EVENT_IMAGES:
+            await _update_prompt_message(
+                message,
+                state,
+                t("edit.image_limit_reached", limit=MAX_EVENT_IMAGES),
+                edit_images_keyboard(),
+            )
+            await safe_delete(message)
+            return
+        images.append(message.photo[-1].file_id)
+        await state.update_data(new_image_file_ids=images)
+        await _render_edit_image_prompt(message, state)
+        await safe_delete(message)
+        return
+    text_raw = (message.text or "").strip()
+    lowered = text_raw.lower()
+    if lowered in {"очистить", "clear"}:
+        images = []
+        await state.update_data(new_image_file_ids=images)
+        await _update_prompt_message(
+            message,
+            state,
+            t("edit.images_cleared"),
+            edit_images_keyboard(),
+        )
+        await safe_delete(message)
+        return
+    await _update_prompt_message(
+        message,
+        state,
+        t("edit.image_invalid"),
+        edit_images_keyboard(),
+    )
+    await safe_delete(message)
+
+
 @router.callback_query(F.data == EDIT_EVENT_SAVE)
-async def save_edit_reminders(callback: CallbackQuery, state: FSMContext) -> None:
+async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
+    current_state = await state.get_state()
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
         await callback.answer(t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
-    updates = {
-        "reminder_3days": data.get("reminder_3days", False),
-        "reminder_1day": data.get("reminder_1day", False),
-    }
     services = get_services()
-    event = await services.events.update_event(event_id, updates)
-    if event is None:
-        await callback.answer(t("error.save_failed"), show_alert=True)
+    if current_state == EditEventState.reminders.state:
+        updates = {
+            "reminder_3days": data.get("reminder_3days", False),
+            "reminder_1day": data.get("reminder_1day", False),
+        }
+        event = await services.events.update_event(event_id, updates)
+        if event is None:
+            await callback.answer(t("error.save_failed"), show_alert=True)
+            return
+        if callback.message:
+            await _remove_prompt_message(callback.message, state)
+            await safe_delete(callback.message)
+            await _notify_event_update(callback.message, state, event, t("edit.reminders_saved"))
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("edit.event_options_prompt"),
+                manage_event_actions_keyboard(event_id),
+            )
+        await state.update_data(edit_stack=["actions"])
+        await state.set_state(EditEventState.selecting_field)
+        await callback.answer()
         return
-    if callback.message:
-        await _remove_prompt_message(callback.message, state)
-        await safe_delete(callback.message)
-        await _notify_event_update(callback.message, state, event, t("edit.reminders_saved"))
-        await _send_prompt_text(
-            callback.message,
-            state,
-            t("edit.event_options_prompt"),
-            manage_event_actions_keyboard(event_id),
-        )
-    await state.update_data(edit_stack=["actions"])
-    await state.set_state(EditEventState.selecting_field)
+    if current_state == EditEventState.image_upload.state:
+        image_list = list(data.get("new_image_file_ids", []))
+        event = await services.events.update_event(event_id, {"image_file_ids": image_list})
+        if event is None:
+            await callback.answer(t("error.save_failed"), show_alert=True)
+            return
+        if callback.message:
+            await _remove_prompt_message(callback.message, state)
+            await safe_delete(callback.message)
+            await _notify_event_update(
+                callback.message,
+                state,
+                event,
+                t("edit.images_saved"),
+            )
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("edit.event_options_prompt"),
+                manage_event_actions_keyboard(event_id),
+            )
+        await state.update_data(edit_stack=["actions"], new_image_file_ids=[], edit_field=None)
+        await state.set_state(EditEventState.selecting_field)
+        await callback.answer()
+        return
     await callback.answer()
 
 
@@ -770,6 +903,66 @@ async def _send_prompt_text(message: Message, state: FSMContext, text: str, repl
     return sent
 
 
+async def _update_prompt_message(message: Message, state: FSMContext, text: str, reply_markup) -> None:
+    data = await state.get_data()
+    prompt_id = data.get(PROMPT_KEY)
+    prompt_chat = data.get(PROMPT_CHAT_KEY)
+    bot = message.bot
+    if prompt_id and prompt_chat and bot:
+        try:
+            await bot.edit_message_text(
+                text=text,
+                chat_id=prompt_chat,
+                message_id=prompt_id,
+                reply_markup=reply_markup,
+            )
+            return
+        except TelegramBadRequest:
+            pass
+    await _send_prompt_text(message, state, text, reply_markup)
+
+
+async def _render_create_image_prompt(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    count = len(data.get("image_file_ids", []))
+    await _update_prompt_message(
+        message,
+        state,
+        t("create.image_prompt", limit=MAX_EVENT_IMAGES, count=count),
+        create_step_keyboard(back_enabled=True, skip_enabled=True, confirm_enabled=True),
+    )
+
+
+async def _render_edit_image_prompt(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    count = len(data.get("new_image_file_ids", []))
+    await _update_prompt_message(
+        message,
+        state,
+        t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=count),
+        edit_images_keyboard(),
+    )
+
+
+async def _store_preview_media(state: FSMContext, messages: list[Message]) -> None:
+    if not messages:
+        return
+    entries = [{"chat_id": msg.chat.id, "message_id": msg.message_id} for msg in messages]
+    data = await state.get_data()
+    existing = list(data.get(PREVIEW_MEDIA_KEY, []))
+    existing.extend(entries)
+    await state.update_data(**{PREVIEW_MEDIA_KEY: existing})
+
+
+async def _clear_preview_media(state: FSMContext, bot) -> None:
+    data = await state.get_data()
+    entries = list(data.get(PREVIEW_MEDIA_KEY, []))
+    if bot:
+        for entry in entries:
+            await safe_delete_by_id(bot, entry.get("chat_id"), entry.get("message_id"))
+    await state.update_data(**{PREVIEW_MEDIA_KEY: []})
+
+
 async def _send_prompt_photo(message: Message, state: FSMContext, photo: str, caption: str, reply_markup) -> Message:
     await _remove_prompt_message(message, state)
     sent = await message.answer_photo(photo, caption=caption, reply_markup=reply_markup)
@@ -785,12 +978,20 @@ async def _notify_new_event(callback: CallbackQuery, event: Event) -> None:
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
     telegram_ids = await services.users.list_all_telegram_ids()
+    images = list(event.image_file_ids)
     for telegram_id in telegram_ids:
         if creator_id and telegram_id == creator_id:
             continue
         try:
-            if event.image_file_id:
-                await bot.send_photo(telegram_id, event.image_file_id, caption=text)
+            if images:
+                if len(images) == 1:
+                    await bot.send_photo(telegram_id, images[0], caption=text)
+                else:
+                    media = [
+                        InputMediaPhoto(media=file_id, caption=text if idx == 0 else None)
+                        for idx, file_id in enumerate(images)
+                    ]
+                    await bot.send_media_group(telegram_id, media)
             else:
                 await bot.send_message(telegram_id, text)
         except Exception:
@@ -863,12 +1064,7 @@ async def _prompt_create_state(message: Message, state: FSMContext, target_state
             create_step_keyboard(back_enabled=True, skip_enabled=True),
         )
     elif target_state == CreateEventState.image:
-        await _send_prompt_text(
-            message,
-            state,
-            t("create.image_prompt"),
-            create_step_keyboard(back_enabled=True, skip_enabled=True),
-        )
+        await _render_create_image_prompt(message, state)
     elif target_state == CreateEventState.limit:
         await _send_prompt_text(
             message,
@@ -934,6 +1130,7 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     payload = _build_event_payload(data)
     cost_value = payload.get("cost")
+    images = tuple(payload.get("image_file_ids", ()))
     event = Event(
         id=0,
         title=payload["title"],
@@ -943,6 +1140,7 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
         description=payload.get("description"),
         cost=float(cost_value) if cost_value is not None else None,
         image_file_id=payload.get("image_file_id"),
+        image_file_ids=images,
         max_participants=payload.get("max_participants"),
         reminder_3days=payload.get("reminder_3days", False),
         reminder_1day=payload.get("reminder_1day", False),
@@ -952,13 +1150,23 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
     markup = create_preview_keyboard()
-    if event.image_file_id:
-        await _send_prompt_photo(message, state, event.image_file_id, text, markup)
-    else:
-        await _send_prompt_text(message, state, text, markup)
+    await _clear_preview_media(state, message.bot)
+    if images:
+        await _remove_prompt_message(message, state)
+        stored_messages: list[Message] = []
+        if len(images) == 1:
+            sent = await message.answer_photo(images[0])
+            stored_messages.append(sent)
+        else:
+            media = [InputMediaPhoto(media=file_id) for file_id in images]
+            media_messages = await message.answer_media_group(media)
+            stored_messages.extend(media_messages)
+        await _store_preview_media(state, stored_messages)
+    await _send_prompt_text(message, state, text, markup)
 
 
 def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
+    images = tuple(data.get("image_file_ids", []))
     return {
         "title": data.get("title"),
         "date": data.get("event_date"),
@@ -966,7 +1174,8 @@ def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
         "place": data.get("place"),
         "description": data.get("description"),
         "cost": data.get("cost"),
-        "image_file_id": data.get("image_file_id"),
+        "image_file_ids": images,
+        "image_file_id": images[0] if images else None,
         "max_participants": data.get("limit"),
         "reminder_3days": data.get("reminder_3days", False),
         "reminder_1day": data.get("reminder_1day", False),
@@ -1009,7 +1218,7 @@ def _edit_prompt_for(field: str) -> str:
         "place": t("edit.prompt_place"),
         "description": t("edit.prompt_description"),
         "cost": t("edit.prompt_cost"),
-        "image": t("edit.prompt_image"),
+        "image": t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=0),
         "limit": t("edit.prompt_limit"),
     }
     return prompts.get(field, t("edit.prompt_value_fallback"))
@@ -1084,6 +1293,6 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
     if field == "image":
         if not message.photo:
             raise ValueError(t("edit.image_required_error"))
-        return {"image_file_id": message.photo[-1].file_id}
+        return {"image_file_ids": [message.photo[-1].file_id]}
     raise ValueError(t("edit.unknown_field_error"))
 

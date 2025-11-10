@@ -1,5 +1,5 @@
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InputMediaPhoto
 
 from keyboards import (
     back_to_main_keyboard,
@@ -34,8 +34,14 @@ async def show_event(callback: CallbackQuery) -> None:
     markup = event_card_keyboard(event.id)
     if callback.message:
         await safe_delete(callback.message)
-        if event.image_file_id:
-            await callback.message.answer_photo(event.image_file_id, caption=text, reply_markup=markup)
+        images = list(event.image_file_ids)
+        if images:
+            if len(images) == 1:
+                await callback.message.answer_photo(images[0], caption=text, reply_markup=markup)
+            else:
+                media = [InputMediaPhoto(media=file_id) for file_id in images]
+                await callback.message.answer_media_group(media)
+                await callback.message.answer(text, reply_markup=markup)
         else:
             await callback.message.answer(text, reply_markup=markup)
     await callback.answer()

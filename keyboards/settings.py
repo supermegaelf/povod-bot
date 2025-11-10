@@ -3,6 +3,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from utils.callbacks import (
     CREATE_EVENT_BACK,
     CREATE_EVENT_CANCEL,
+    CREATE_EVENT_IMAGES_CONFIRM,
     CREATE_EVENT_SKIP,
     CREATE_EVENT_PUBLISH,
     CREATE_EVENT_REMINDER_DONE,
@@ -31,8 +32,10 @@ def moderator_settings_keyboard():
     return builder.as_markup()
 
 
-def create_step_keyboard(back_enabled: bool, skip_enabled: bool = False):
+def create_step_keyboard(back_enabled: bool, skip_enabled: bool = False, confirm_enabled: bool = False):
     builder = InlineKeyboardBuilder()
+    if confirm_enabled:
+        builder.button(text=t("button.create.confirm_images"), callback_data=CREATE_EVENT_IMAGES_CONFIRM)
     if skip_enabled:
         builder.button(text=t("button.skip"), callback_data=CREATE_EVENT_SKIP)
     if back_enabled:
@@ -124,6 +127,14 @@ def edit_reminders_keyboard(selected_3: bool, selected_1: bool):
     )
     builder.button(text=label_3, callback_data=CREATE_EVENT_REMINDER_TOGGLE_3)
     builder.button(text=label_1, callback_data=CREATE_EVENT_REMINDER_TOGGLE_1)
+    builder.button(text=t("button.edit.save"), callback_data=EDIT_EVENT_SAVE)
+    builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def edit_images_keyboard():
+    builder = InlineKeyboardBuilder()
     builder.button(text=t("button.edit.save"), callback_data=EDIT_EVENT_SAVE)
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)

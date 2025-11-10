@@ -19,4 +19,5 @@ class EditEventState(StatesGroup):
     value_input = State()
     reminders = State()
     confirmation = State()
+    image_upload = State()
 
