@@ -7,26 +7,6 @@ from services.registration_service import Availability
 from utils.i18n import t
 
 
-def format_event_summary(event: Event) -> str:
-    if event.time:
-        event_datetime = datetime.combine(event.date, event.time)
-        moment_line = t("event.summary.datetime", datetime=event_datetime.strftime(t("format.display_datetime")))
-    else:
-        moment_line = t("event.summary.date", date=event.date.strftime(t("format.display_date")))
-    lines = [
-        t("event.summary.header", title=event.title),
-        moment_line,
-    ]
-    if event.place:
-        lines.append(t("event.summary.place", place=event.place))
-    if event.cost is not None:
-        if event.cost > 0:
-            lines.append(t("event.summary.cost", cost=_format_cost(event.cost)))
-        elif event.cost == 0:
-            lines.append(t("event.summary.cost_free"))
-    return "\n".join(lines)
-
-
 def format_event_card(event: Event, availability: Availability | None = None) -> str:
     lines: list[str] = [t("event.card.header", title=event.title)]
 

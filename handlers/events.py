@@ -64,7 +64,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
         return
     if callback.message:
         await safe_delete(callback.message)
-        await callback.message.answer(t("menu.event_selection_prompt"), reply_markup=event_list_keyboard(events))
+        await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events))
     await callback.answer()
 
 
