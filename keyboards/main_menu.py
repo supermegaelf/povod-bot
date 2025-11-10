@@ -4,12 +4,6 @@ from utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS, S
 from utils.i18n import t
 
 
-def start_keyboard():
-    builder = InlineKeyboardBuilder()
-    builder.button(text=t("button.start"), callback_data=START_MAIN_MENU)
-    return builder.as_markup()
-
-
 def main_menu_keyboard(show_settings: bool):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.menu.actual"), callback_data=MENU_ACTUAL_EVENTS)
