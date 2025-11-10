@@ -36,7 +36,11 @@ async def show_community(callback: CallbackQuery) -> None:
     user = await services.users.ensure(tg_user.id, tg_user.username)
     if callback.message:
         await safe_delete(callback.message)
-        await callback.message.answer(t("placeholder.community"), reply_markup=back_to_main_keyboard())
+        await callback.message.answer(
+            t("placeholder.community"),
+            reply_markup=back_to_main_keyboard(),
+            disable_web_page_preview=True,
+        )
     await callback.answer()
 
 
