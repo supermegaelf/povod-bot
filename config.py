@@ -17,9 +17,19 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True)
+class CommunityLinks:
+    channel_main: str
+    channel_reading: str
+    channel_ride: str
+    chat_social: str
+    chat_discuss: str
+
+
+@dataclass(frozen=True)
 class Config:
     bot: BotConfig
     database: DatabaseConfig
+    community: CommunityLinks
 
 
 def _parse_admin_ids(raw: str | None) -> Sequence[int]:
@@ -43,8 +53,23 @@ def load_config() -> Config:
     if not dsn:
         raise RuntimeError("DATABASE_URL is not set")
     admin_ids = _parse_admin_ids(os.getenv("ADMIN_IDS"))
+    community = CommunityLinks(
+        channel_main=_require_env("COMMUNITY_CHANNEL_MAIN_URL"),
+        channel_reading=_require_env("COMMUNITY_CHANNEL_READING_URL"),
+        channel_ride=_require_env("COMMUNITY_CHANNEL_RIDE_URL"),
+        chat_social=_require_env("COMMUNITY_CHAT_SOCIAL_URL"),
+        chat_discuss=_require_env("COMMUNITY_CHAT_DISCUSS_URL"),
+    )
     return Config(
         bot=BotConfig(token=token, admin_ids=admin_ids),
         database=DatabaseConfig(dsn=dsn),
+        community=community,
     )
+
+
+def _require_env(key: str) -> str:
+    value = os.getenv(key)
+    if not value:
+        raise RuntimeError(f"{key} is not set")
+    return value
 
