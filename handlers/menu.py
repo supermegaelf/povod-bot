@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery
 
 from keyboards import back_to_main_keyboard, event_list_keyboard, moderator_settings_keyboard
 from utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS
-from utils.di import get_services
+from utils.di import get_config, get_services
 from utils.i18n import t
 from utils.messaging import safe_delete
 
@@ -36,8 +36,17 @@ async def show_community(callback: CallbackQuery) -> None:
     user = await services.users.ensure(tg_user.id, tg_user.username)
     if callback.message:
         await safe_delete(callback.message)
+        config = get_config()
+        community_links = config.community
+        text = t("placeholder.community").format(
+            channel_main=community_links.channel_main,
+            channel_reading=community_links.channel_reading,
+            channel_ride=community_links.channel_ride,
+            chat_social=community_links.chat_social,
+            chat_discuss=community_links.chat_discuss,
+        )
         await callback.message.answer(
-            t("placeholder.community"),
+            text,
             reply_markup=back_to_main_keyboard(),
             disable_web_page_preview=True,
         )
