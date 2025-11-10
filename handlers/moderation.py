@@ -383,11 +383,16 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
     images = list(data.get("image_file_ids", []))
     if message.photo:
         if len(images) >= MAX_EVENT_IMAGES:
+            confirm_available = len(images) > 0
             await _update_prompt_message(
                 message,
                 state,
                 t("create.image_limit_reached", limit=MAX_EVENT_IMAGES),
-                create_step_keyboard(back_enabled=True, skip_enabled=True, confirm_enabled=True),
+                create_step_keyboard(
+                    back_enabled=True,
+                    skip_enabled=True,
+                    confirm_enabled=confirm_available,
+                ),
             )
             await safe_delete(message)
             return
@@ -420,11 +425,16 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
         await _render_create_image_prompt(message, state)
         await safe_delete(message)
         return
+    confirm_available = len(images) > 0
     await _update_prompt_message(
         message,
         state,
         t("create.image_invalid"),
-        create_step_keyboard(back_enabled=True, skip_enabled=True, confirm_enabled=True),
+        create_step_keyboard(
+            back_enabled=True,
+            skip_enabled=True,
+            confirm_enabled=confirm_available,
+        ),
     )
     await safe_delete(message)
 
@@ -929,7 +939,11 @@ async def _render_create_image_prompt(message: Message, state: FSMContext) -> No
         message,
         state,
         t("create.image_prompt", limit=MAX_EVENT_IMAGES, count=count),
-        create_step_keyboard(back_enabled=True, skip_enabled=True, confirm_enabled=True),
+        create_step_keyboard(
+            back_enabled=True,
+            skip_enabled=True,
+            confirm_enabled=count > 0,
+        ),
     )
 
 
