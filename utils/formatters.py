@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import textwrap
 
@@ -16,12 +15,7 @@ def format_event_card(event: Event, availability: Availability | None = None) ->
 
     detail_lines: list[str] = []
 
-    if event.date and event.time:
-        event_datetime = datetime.combine(event.date, event.time)
-        detail_lines.append(t("event.card.date", date=event_datetime.strftime(t("format.display_date"))))
-        detail_lines.append(t("event.card.time", time=event_datetime.strftime(t("format.display_time"))))
-    elif event.date:
-        detail_lines.append(t("event.card.date", date=event.date.strftime(t("format.display_date"))))
+    detail_lines.extend(_format_schedule(event))
     if event.place:
         detail_lines.append(t("event.card.place", place=event.place))
 
@@ -73,4 +67,26 @@ def _format_description(text: str, width: int = 60) -> str:
             continue
         wrapped.append("\n".join(textwrap.wrap(chunk, width=width, break_long_words=False, break_on_hyphens=False)) or chunk)
     return "\n".join(wrapped).strip()
+
+
+def _format_schedule(event: Event) -> list[str]:
+    lines: list[str] = []
+    if event.date:
+        start = event.date.strftime(t("format.display_date"))
+        if event.end_date and event.end_date != event.date:
+            end = event.end_date.strftime(t("format.display_date"))
+            lines.append(t("event.card.date_range", start=start, end=end))
+        else:
+            lines.append(t("event.card.date", date=start))
+    if event.time:
+        start_time = event.time.strftime(t("format.display_time"))
+        if event.end_time and event.end_time != event.time:
+            end_time = event.end_time.strftime(t("format.display_time"))
+            lines.append(t("event.card.time_range", start=start_time, end=end_time))
+        else:
+            lines.append(t("event.card.time", time=start_time))
+    elif event.end_time:
+        end_time = event.end_time.strftime(t("format.display_time"))
+        lines.append(t("event.card.time", time=end_time))
+    return lines
 
