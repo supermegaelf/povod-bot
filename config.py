@@ -26,10 +26,16 @@ class CommunityLinks:
 
 
 @dataclass(frozen=True)
+class SupportLinks:
+    question_url: str
+
+
+@dataclass(frozen=True)
 class Config:
     bot: BotConfig
     database: DatabaseConfig
     community: CommunityLinks
+    support: SupportLinks
 
 
 def _parse_admin_ids(raw: str | None) -> Sequence[int]:
@@ -60,10 +66,14 @@ def load_config() -> Config:
         chat_social=_require_env("COMMUNITY_CHAT_SOCIAL_URL"),
         chat_discuss=_require_env("COMMUNITY_CHAT_DISCUSS_URL"),
     )
+    support = SupportLinks(
+        question_url=_require_env("EVENT_QUESTION_URL"),
+    )
     return Config(
         bot=BotConfig(token=token, admin_ids=admin_ids),
         database=DatabaseConfig(dsn=dsn),
         community=community,
+        support=support,
     )
 
 

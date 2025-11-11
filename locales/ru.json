@@ -96,6 +96,7 @@
   "button.manage_events": "Управлять поводами 🛠️",
   "button.event.list_item": "«{title}»",
   "button.event.pay": "Оплатить 💳",
+  "button.event.ask_question": "Задать вопрос❔",
   "button.create.reminder_3days": "Напомнить за 3 дня",
   "button.create.reminder_3days_selected": "Напомнить за 3 дня ✅",
   "button.create.reminder_1day": "Напомнить за 1 день",
