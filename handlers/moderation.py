@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
+from typing import Any, Callable, Optional, TypeVar
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -66,6 +66,7 @@ CREATE_STATE_SEQUENCE = [
     CreateEventState.title,
     CreateEventState.date,
     CreateEventState.time,
+    CreateEventState.period,
     CreateEventState.place,
     CreateEventState.description,
     CreateEventState.cost,
@@ -143,7 +144,18 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
         return
     if current_state == CreateEventState.time.state:
         await _push_create_history(state, CreateEventState.time)
-        await state.update_data(event_time=None)
+        await state.update_data(event_time=None, event_end_time=None)
+        await state.set_state(CreateEventState.place)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.place_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.period.state:
+        await _push_create_history(state, CreateEventState.period)
+        await state.update_data(event_end_time=None)
         await state.set_state(CreateEventState.place)
         if callback.message:
             await _send_prompt_text(
@@ -249,7 +261,7 @@ async def process_create_title(message: Message, state: FSMContext) -> None:
 async def process_create_date(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     try:
-        parsed_date = datetime.strptime(text, t("format.input_date")).date()
+        start_date, end_date = _parse_date_input(text)
     except ValueError:
         await _send_prompt_text(
             message,
@@ -260,7 +272,12 @@ async def process_create_date(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     await _push_create_history(state, CreateEventState.date)
-    await state.update_data(event_date=parsed_date, event_time=None)
+    await state.update_data(
+        event_date=start_date,
+        event_end_date=end_date,
+        event_time=None,
+        event_end_time=None,
+    )
     await state.set_state(CreateEventState.time)
     await _send_prompt_text(
         message,
@@ -277,7 +294,7 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
     lowered = text.lower()
     if not text or lowered in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.time)
-        await state.update_data(event_time=None)
+        await state.update_data(event_time=None, event_end_time=None)
         await state.set_state(CreateEventState.place)
         await _send_prompt_text(
             message,
@@ -288,7 +305,7 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     try:
-        parsed_time = datetime.strptime(text, t("format.input_time")).time()
+        parsed_time = _parse_single_time(text)
     except ValueError:
         await _send_prompt_text(
             message,
@@ -299,7 +316,57 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     await _push_create_history(state, CreateEventState.time)
-    await state.update_data(event_time=parsed_time)
+    await state.update_data(event_time=parsed_time, event_end_time=None)
+    await state.set_state(CreateEventState.period)
+    await _send_prompt_text(
+        message,
+        state,
+        t("create.period_prompt"),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
+    )
+    await safe_delete(message)
+
+
+@router.message(CreateEventState.period)
+async def process_create_period(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    lowered = text.lower()
+    if not text or lowered in {"пропустить", "skip"}:
+        await _push_create_history(state, CreateEventState.period)
+        await state.update_data(event_end_time=None)
+        await state.set_state(CreateEventState.place)
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.place_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    try:
+        start_time, end_time = _parse_period_input(text)
+    except ValueError:
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.period_invalid"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    data = await state.get_data()
+    current_start = data.get("event_time")
+    if current_start and current_start != start_time:
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.period_mismatch"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    await _push_create_history(state, CreateEventState.period)
+    await state.update_data(event_time=start_time, event_end_time=end_time)
     await state.set_state(CreateEventState.place)
     await _send_prompt_text(
         message,
@@ -1028,6 +1095,7 @@ def _admin_success_message(field: str) -> str:
         "title": t("edit.success.title"),
         "date": t("edit.success.date"),
         "time": t("edit.success.time"),
+        "period": t("edit.success.period"),
         "place": t("edit.success.place"),
         "description": t("edit.success.description"),
         "cost": t("edit.success.cost"),
@@ -1146,6 +1214,13 @@ async def _prompt_create_state(message: Message, state: FSMContext, target_state
             t("create.time_prompt"),
             create_step_keyboard(back_enabled=True, skip_enabled=True),
         )
+    elif target_state == CreateEventState.period:
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.period_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
     elif target_state == CreateEventState.place:
         await _send_prompt_text(
             message,
@@ -1240,6 +1315,8 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
         title=payload["title"],
         date=payload["date"],
         time=payload["time"],
+        end_date=payload.get("end_date"),
+        end_time=payload.get("end_time"),
         place=payload.get("place"),
         description=payload.get("description"),
         cost=float(cost_value) if cost_value is not None else None,
@@ -1275,6 +1352,8 @@ def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
         "title": data.get("title"),
         "date": data.get("event_date"),
         "time": data.get("event_time"),
+        "end_date": data.get("event_end_date"),
+        "end_time": data.get("event_end_time"),
         "place": data.get("place"),
         "description": data.get("description"),
         "cost": data.get("cost"),
@@ -1285,6 +1364,51 @@ def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
         "reminder_1day": data.get("reminder_1day", False),
         "status": "active",
     }
+
+
+T = TypeVar("T")
+
+
+def _parse_range_input(value: str, parser: Callable[[str], T]) -> tuple[T, Optional[T]]:
+    normalized = value.replace("—", "-").replace("–", "-")
+    stripped = normalized.strip()
+    if "-" not in stripped:
+        cleaned = stripped.strip('"')
+        return parser(cleaned), None
+    left_raw, right_raw = stripped.split("-", 1)
+    left = left_raw.strip().strip('"')
+    right = right_raw.strip().strip('"')
+    if not left or not right:
+        raise ValueError
+    start = parser(left)
+    end = parser(right)
+    return start, end
+
+
+def _parse_date_input(value: str) -> tuple[date, Optional[date]]:
+    pattern = t("format.input_date")
+    start, end = _parse_range_input(value, lambda chunk: datetime.strptime(chunk, pattern).date())
+    if end is not None and end < start:
+        raise ValueError
+    return start, end
+
+
+def _parse_single_time(value: str) -> time:
+    if "-" in value.replace("—", "-").replace("–", "-"):
+        raise ValueError
+    pattern = t("format.input_time")
+    cleaned = value.strip().strip('"')
+    return datetime.strptime(cleaned, pattern).time()
+
+
+def _parse_period_input(value: str) -> tuple[time, time]:
+    pattern = t("format.input_time")
+    start, end = _parse_range_input(value, lambda chunk: datetime.strptime(chunk, pattern).time())
+    if end is None:
+        raise ValueError
+    if end < start:
+        raise ValueError
+    return start, end
 
 
 async def _ensure_event_context(state: FSMContext, event_id: int) -> None:
@@ -1319,6 +1443,7 @@ def _edit_prompt_for(field: str) -> str:
         "title": t("edit.prompt_title"),
         "date": t("edit.prompt_date"),
         "time": t("edit.prompt_time"),
+        "period": t("edit.prompt_period"),
         "place": t("edit.prompt_place"),
         "description": t("edit.prompt_description"),
         "cost": t("edit.prompt_cost"),
@@ -1333,6 +1458,7 @@ def _field_label(field: str) -> str:
         "title": t("button.field.title"),
         "date": t("button.field.date"),
         "time": t("button.field.time"),
+        "period": t("button.field.period"),
         "place": t("button.field.place"),
         "description": t("button.field.description"),
         "cost": t("button.field.cost"),
@@ -1380,20 +1506,30 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
     if field == "date":
         text = (message.text or "").strip()
         try:
-            parsed_date = datetime.strptime(text, t("format.input_date")).date()
+            start_date, end_date = _parse_date_input(text)
         except ValueError as error:
             raise ValueError(t("edit.date_invalid_error")) from error
-        return {"date": parsed_date}
+        return {"date": start_date, "end_date": end_date}
     if field == "time":
         text = (message.text or "").strip()
         lowered = text.lower()
         if not text or lowered in {"пропустить", "skip"}:
-            return {"time": None}
+            return {"time": None, "end_time": None}
         try:
-            parsed_time = datetime.strptime(text, t("format.input_time")).time()
+            parsed_time = _parse_single_time(text)
         except ValueError as error:
             raise ValueError(t("edit.time_invalid_error")) from error
         return {"time": parsed_time}
+    if field == "period":
+        text = (message.text or "").strip()
+        lowered = text.lower()
+        if not text or lowered in {"пропустить", "skip"}:
+            return {"end_time": None}
+        try:
+            start_time, end_time = _parse_period_input(text)
+        except ValueError as error:
+            raise ValueError(t("edit.period_invalid_error")) from error
+        return {"time": start_time, "end_time": end_time}
     if field == "image":
         if not message.photo:
             raise ValueError(t("edit.image_required_error"))

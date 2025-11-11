@@ -11,6 +11,8 @@ class Event:
     title: str
     date: date
     time: Optional[time]
+    end_date: Optional[date]
+    end_time: Optional[time]
     place: Optional[str]
     description: Optional[str]
     cost: Optional[float]
@@ -28,7 +30,7 @@ class EventRepository:
 
     async def list_active(self, limit: int = 5) -> Sequence[Event]:
         query = """
-        SELECT id, title, date, time, place, description, cost, image_file_id,
+        SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
                max_participants, reminder_3days, reminder_1day, status
         FROM events
         WHERE status = 'active'
@@ -43,7 +45,7 @@ class EventRepository:
 
     async def get(self, event_id: int) -> Optional[Event]:
         query = """
-        SELECT id, title, date, time, place, description, cost, image_file_id,
+        SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
                max_participants, reminder_3days, reminder_1day, status
         FROM events
         WHERE id = $1
@@ -58,10 +60,10 @@ class EventRepository:
 
     async def create(self, data: dict) -> Event:
         query = """
-        INSERT INTO events (title, date, time, place, description, cost, image_file_id,
+        INSERT INTO events (title, date, time, end_date, end_time, place, description, cost, image_file_id,
                             max_participants, reminder_3days, reminder_1day, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING id, title, date, time, place, description, cost, image_file_id,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
                   max_participants, reminder_3days, reminder_1day, status
         """
         raw_images = data.get("image_file_ids")
@@ -78,6 +80,8 @@ class EventRepository:
                     data["title"],
                     data["date"],
                     data["time"],
+                    data.get("end_date"),
+                    data.get("end_time"),
                     data.get("place"),
                     data.get("description"),
                     data.get("cost"),
@@ -119,7 +123,7 @@ class EventRepository:
         UPDATE events
         SET {placeholders}
         WHERE id = ${len(values)}
-        RETURNING id, title, date, time, place, description, cost, image_file_id,
+        RETURNING id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
                   max_participants, reminder_3days, reminder_1day, status
         """
         async with self._pool.acquire() as connection:
@@ -139,6 +143,8 @@ class EventRepository:
             title=record["title"],
             date=record["date"],
             time=record["time"],
+            end_date=record["end_date"],
+            end_time=record["end_time"],
             place=record["place"],
             description=record["description"],
             cost=float(record["cost"]) if record["cost"] is not None else None,

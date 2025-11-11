@@ -5,6 +5,7 @@ class CreateEventState(StatesGroup):
     title = State()
     date = State()
     time = State()
+    period = State()
     place = State()
     description = State()
     cost = State()
