@@ -12,6 +12,7 @@ from utils.callbacks import (
     EDIT_EVENT_BACK,
     EDIT_EVENT_CANCEL,
     EDIT_EVENT_SAVE,
+    EDIT_EVENT_CLEAR_IMAGES,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     START_MAIN_MENU,
@@ -76,7 +77,7 @@ def manage_events_keyboard(events):
     builder = InlineKeyboardBuilder()
     for event in events:
         builder.button(text=t("button.event.list_item", title=event.title), callback_data=edit_event(event.id))
-    builder.button(text=t("button.back"), callback_data=START_MAIN_MENU)
+    builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
     return builder.as_markup()
 
@@ -133,9 +134,12 @@ def edit_reminders_keyboard(selected_3: bool, selected_1: bool):
     return builder.as_markup()
 
 
-def edit_images_keyboard():
+def edit_images_keyboard(has_images: bool, dirty: bool):
     builder = InlineKeyboardBuilder()
-    builder.button(text=t("button.edit.save"), callback_data=EDIT_EVENT_SAVE)
+    if dirty and has_images:
+        builder.button(text=t("button.edit.save"), callback_data=EDIT_EVENT_SAVE)
+    elif has_images:
+        builder.button(text=t("button.edit.clear"), callback_data=EDIT_EVENT_CLEAR_IMAGES)
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
     return builder.as_markup()
