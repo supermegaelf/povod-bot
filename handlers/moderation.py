@@ -65,11 +65,11 @@ PREVIEW_MEDIA_KEY = "preview_media_entries"
 CREATE_STATE_SEQUENCE = [
     CreateEventState.title,
     CreateEventState.date,
-    CreateEventState.time,
-    CreateEventState.period,
-    CreateEventState.place,
-    CreateEventState.description,
     CreateEventState.cost,
+    CreateEventState.description,
+    CreateEventState.time,
+    CreateEventState.place,
+    CreateEventState.period,
     CreateEventState.image,
     CreateEventState.limit,
     CreateEventState.reminders,
@@ -142,31 +142,9 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
     if current_state is None:
         await callback.answer()
         return
-    if current_state == CreateEventState.time.state:
-        await _push_create_history(state, CreateEventState.time)
-        await state.update_data(event_time=None, event_end_time=None)
-        await state.set_state(CreateEventState.place)
-        if callback.message:
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("create.place_prompt"),
-                create_step_keyboard(back_enabled=True, skip_enabled=True),
-            )
-    elif current_state == CreateEventState.period.state:
-        await _push_create_history(state, CreateEventState.period)
-        await state.update_data(event_end_time=None)
-        await state.set_state(CreateEventState.place)
-        if callback.message:
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("create.place_prompt"),
-                create_step_keyboard(back_enabled=True, skip_enabled=True),
-            )
-    elif current_state == CreateEventState.place.state:
-        await _push_create_history(state, CreateEventState.place)
-        await state.update_data(place=None)
+    if current_state == CreateEventState.cost.state:
+        await _push_create_history(state, CreateEventState.cost)
+        await state.update_data(cost=None)
         await state.set_state(CreateEventState.description)
         if callback.message:
             await _send_prompt_text(
@@ -178,17 +156,39 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
     elif current_state == CreateEventState.description.state:
         await _push_create_history(state, CreateEventState.description)
         await state.update_data(description=None)
-        await state.set_state(CreateEventState.cost)
+        await state.set_state(CreateEventState.time)
         if callback.message:
             await _send_prompt_text(
                 callback.message,
                 state,
-                t("create.cost_prompt"),
+                t("create.time_prompt"),
+                create_step_keyboard(back_enabled=True),
+            )
+    elif current_state == CreateEventState.time.state:
+        await _push_create_history(state, CreateEventState.time)
+        await state.update_data(event_time=None, event_end_time=None)
+        await state.set_state(CreateEventState.place)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.place_prompt"),
                 create_step_keyboard(back_enabled=True, skip_enabled=True),
             )
-    elif current_state == CreateEventState.cost.state:
-        await _push_create_history(state, CreateEventState.cost)
-        await state.update_data(cost=None)
+    elif current_state == CreateEventState.place.state:
+        await _push_create_history(state, CreateEventState.place)
+        await state.update_data(place=None)
+        await state.set_state(CreateEventState.period)
+        if callback.message:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("create.period_prompt"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+    elif current_state == CreateEventState.period.state:
+        await _push_create_history(state, CreateEventState.period)
+        await state.update_data(event_end_time=None)
         await state.set_state(CreateEventState.image)
         if callback.message:
             await _render_create_image_prompt(callback.message, state)
@@ -278,11 +278,11 @@ async def process_create_date(message: Message, state: FSMContext) -> None:
         event_time=None,
         event_end_time=None,
     )
-    await state.set_state(CreateEventState.time)
+    await state.set_state(CreateEventState.cost)
     await _send_prompt_text(
         message,
         state,
-        t("create.time_prompt"),
+        t("create.cost_prompt"),
         create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
@@ -293,14 +293,11 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     lowered = text.lower()
     if not text or lowered in {"пропустить", "skip"}:
-        await _push_create_history(state, CreateEventState.time)
-        await state.update_data(event_time=None, event_end_time=None)
-        await state.set_state(CreateEventState.place)
         await _send_prompt_text(
             message,
             state,
-            t("create.place_prompt"),
-            create_step_keyboard(back_enabled=True, skip_enabled=True),
+            t("create.time_invalid"),
+            create_step_keyboard(back_enabled=True),
         )
         await safe_delete(message)
         return
@@ -317,11 +314,11 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
         return
     await _push_create_history(state, CreateEventState.time)
     await state.update_data(event_time=parsed_time, event_end_time=None)
-    await state.set_state(CreateEventState.period)
+    await state.set_state(CreateEventState.place)
     await _send_prompt_text(
         message,
         state,
-        t("create.period_prompt"),
+        t("create.place_prompt"),
         create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
@@ -334,13 +331,8 @@ async def process_create_period(message: Message, state: FSMContext) -> None:
     if not text or lowered in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.period)
         await state.update_data(event_end_time=None)
-        await state.set_state(CreateEventState.place)
-        await _send_prompt_text(
-            message,
-            state,
-            t("create.place_prompt"),
-            create_step_keyboard(back_enabled=True, skip_enabled=True),
-        )
+        await state.set_state(CreateEventState.image)
+        await _render_create_image_prompt(message, state)
         await safe_delete(message)
         return
     try:
@@ -367,13 +359,8 @@ async def process_create_period(message: Message, state: FSMContext) -> None:
         return
     await _push_create_history(state, CreateEventState.period)
     await state.update_data(event_time=start_time, event_end_time=end_time)
-    await state.set_state(CreateEventState.place)
-    await _send_prompt_text(
-        message,
-        state,
-        t("create.place_prompt"),
-        create_step_keyboard(back_enabled=True, skip_enabled=True),
-    )
+    await state.set_state(CreateEventState.image)
+    await _render_create_image_prompt(message, state)
     await safe_delete(message)
 
 
@@ -386,11 +373,11 @@ async def process_create_place(message: Message, state: FSMContext) -> None:
         await state.update_data(place=text)
     else:
         await state.update_data(place=None)
-    await state.set_state(CreateEventState.description)
+    await state.set_state(CreateEventState.period)
     await _send_prompt_text(
         message,
         state,
-        t("create.description_prompt"),
+        t("create.period_prompt"),
         create_step_keyboard(back_enabled=True, skip_enabled=True),
     )
     await safe_delete(message)
@@ -404,12 +391,12 @@ async def process_create_description(message: Message, state: FSMContext) -> Non
         await state.update_data(description=text)
     else:
         await state.update_data(description=None)
-    await state.set_state(CreateEventState.cost)
+    await state.set_state(CreateEventState.time)
     await _send_prompt_text(
         message,
         state,
-        t("create.cost_prompt"),
-        create_step_keyboard(back_enabled=True, skip_enabled=True),
+        t("create.time_prompt"),
+        create_step_keyboard(back_enabled=True),
     )
     await safe_delete(message)
 
@@ -420,8 +407,13 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
     if not raw_text or raw_text.lower() in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.cost)
         await state.update_data(cost=None)
-        await state.set_state(CreateEventState.image)
-        await _render_create_image_prompt(message, state)
+        await state.set_state(CreateEventState.description)
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.description_prompt"),
+            create_step_keyboard(back_enabled=True, skip_enabled=True),
+        )
         await safe_delete(message)
         return
     text = raw_text.replace(" ", "").replace(",", ".")
@@ -440,8 +432,13 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
         return
     await _push_create_history(state, CreateEventState.cost)
     await state.update_data(cost=cost)
-    await state.set_state(CreateEventState.image)
-    await _render_create_image_prompt(message, state)
+    await state.set_state(CreateEventState.description)
+    await _send_prompt_text(
+        message,
+        state,
+        t("create.description_prompt"),
+        create_step_keyboard(back_enabled=True, skip_enabled=True),
+    )
     await safe_delete(message)
 
 
@@ -1212,7 +1209,7 @@ async def _prompt_create_state(message: Message, state: FSMContext, target_state
             message,
             state,
             t("create.time_prompt"),
-            create_step_keyboard(back_enabled=True, skip_enabled=True),
+            create_step_keyboard(back_enabled=True),
         )
     elif target_state == CreateEventState.period:
         await _send_prompt_text(

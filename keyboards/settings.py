@@ -99,15 +99,15 @@ def edit_field_choice_keyboard(event_id: int):
         InlineKeyboardButton(text=t("button.field.date"), callback_data=edit_event_field(event_id, "date")),
     )
     builder.row(
-        InlineKeyboardButton(text=t("button.field.time"), callback_data=edit_event_field(event_id, "time")),
-        InlineKeyboardButton(text=t("button.field.period"), callback_data=edit_event_field(event_id, "period")),
-    )
-    builder.row(
-        InlineKeyboardButton(text=t("button.field.place"), callback_data=edit_event_field(event_id, "place")),
+        InlineKeyboardButton(text=t("button.field.cost"), callback_data=edit_event_field(event_id, "cost")),
         InlineKeyboardButton(text=t("button.field.description"), callback_data=edit_event_field(event_id, "description")),
     )
     builder.row(
-        InlineKeyboardButton(text=t("button.field.cost"), callback_data=edit_event_field(event_id, "cost")),
+        InlineKeyboardButton(text=t("button.field.time"), callback_data=edit_event_field(event_id, "time")),
+        InlineKeyboardButton(text=t("button.field.place"), callback_data=edit_event_field(event_id, "place")),        
+    )
+    builder.row(
+        InlineKeyboardButton(text=t("button.field.period"), callback_data=edit_event_field(event_id, "period")),
         InlineKeyboardButton(text=t("button.field.image"), callback_data=edit_event_field(event_id, "image")),
     )
     builder.row(
