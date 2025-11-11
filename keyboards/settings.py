@@ -1,3 +1,4 @@
+from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils.callbacks import (
@@ -93,17 +94,26 @@ def manage_event_actions_keyboard(event_id: int):
 
 def edit_field_choice_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
-    builder.button(text=t("button.field.title"), callback_data=edit_event_field(event_id, "title"))
-    builder.button(text=t("button.field.date"), callback_data=edit_event_field(event_id, "date"))
-    builder.button(text=t("button.field.time"), callback_data=edit_event_field(event_id, "time"))
-    builder.button(text=t("button.field.place"), callback_data=edit_event_field(event_id, "place"))
-    builder.button(text=t("button.field.description"), callback_data=edit_event_field(event_id, "description"))
-    builder.button(text=t("button.field.cost"), callback_data=edit_event_field(event_id, "cost"))
-    builder.button(text=t("button.field.image"), callback_data=edit_event_field(event_id, "image"))
-    builder.button(text=t("button.field.limit"), callback_data=edit_event_field(event_id, "limit"))
-    builder.button(text=t("button.field.reminders"), callback_data=edit_event_field(event_id, "reminders"))
-    builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
-    builder.adjust(1)
+    builder.row(
+        InlineKeyboardButton(text=t("button.field.title"), callback_data=edit_event_field(event_id, "title")),
+        InlineKeyboardButton(text=t("button.field.date"), callback_data=edit_event_field(event_id, "date")),
+        InlineKeyboardButton(text=t("button.field.time"), callback_data=edit_event_field(event_id, "time")),
+    )
+    builder.row(
+        InlineKeyboardButton(text=t("button.field.place"), callback_data=edit_event_field(event_id, "place")),
+        InlineKeyboardButton(text=t("button.field.description"), callback_data=edit_event_field(event_id, "description")),
+        InlineKeyboardButton(text=t("button.field.cost"), callback_data=edit_event_field(event_id, "cost")),
+    )
+    builder.row(
+        InlineKeyboardButton(text=t("button.field.image"), callback_data=edit_event_field(event_id, "image")),
+        InlineKeyboardButton(text=t("button.field.limit"), callback_data=edit_event_field(event_id, "limit")),
+    )
+    builder.row(
+        InlineKeyboardButton(text=t("button.field.reminders"), callback_data=edit_event_field(event_id, "reminders")),
+    )
+    builder.row(
+        InlineKeyboardButton(text=t("button.back"), callback_data=EDIT_EVENT_BACK),
+    )
     return builder.as_markup()
 
 
