@@ -41,6 +41,7 @@ from utils.callbacks import (
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
     EDIT_EVENT_FIELD_PREFIX,
     EDIT_EVENT_PREFIX,
+    EDIT_EVENT_CLEAR_IMAGES,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     extract_event_id,
@@ -529,7 +530,7 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
         await _send_prompt_text(
             callback.message,
             state,
-            t("menu.event_selection_prompt"),
+            t("menu.actual_prompt"),
             manage_events_keyboard(events),
         )
     await state.update_data(edit_stack=[])
@@ -570,7 +571,7 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         existing_images = list(event.image_file_ids) if event else []
         await _push_edit_stack(state, "images")
         await state.set_state(EditEventState.image_upload)
-        await state.update_data(edit_field=field, new_image_file_ids=existing_images)
+        await state.update_data(edit_field=field, new_image_file_ids=existing_images, images_dirty=False)
         if callback.message:
             await safe_delete(callback.message)
             await _render_edit_image_prompt(callback.message, state)
@@ -611,7 +612,7 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
         await _send_prompt_text(
             callback.message,
             state,
-            event.title,
+            t("edit.event_options_prompt"),
             manage_event_actions_keyboard(event_id),
         )
     await callback.answer()
@@ -634,6 +635,18 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(edit_stack=stack)
     event_id = data.get("edit_event_id")
     if not event_id:
+        await state.clear()
+        await callback.answer()
+        return
+    if not stack:
+        services = get_services()
+        events = await services.events.get_active_events()
+        if callback.message:
+            await safe_delete(callback.message)
+            await callback.message.answer(
+                t("menu.actual_prompt"),
+                reply_markup=manage_events_keyboard(events) if events else moderator_settings_keyboard(),
+            )
         await state.clear()
         await callback.answer()
         return
@@ -661,11 +674,17 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
             )
         await state.update_data(new_image_file_ids=[])
         await state.set_state(EditEventState.selecting_field)
-    elif current == "actions" or current is None:
+    elif current == "actions":
         if callback.message:
             await safe_delete(callback.message)
-            await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
-        await state.clear()
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("edit.event_options_prompt"),
+                manage_event_actions_keyboard(event_id),
+            )
+        await state.update_data(edit_stack=["actions"])
+        await state.set_state(EditEventState.selecting_field)
     else:
         if callback.message:
             await safe_delete(callback.message)
@@ -722,15 +741,12 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         await state.clear()
         return
-    await _notify_event_update(message, state, event, t("notify.event_update_notice", field=_field_label(field)))
+    success_notice = t("notify.event_update_notice", field=_field_label(field))
+    admin_notice = _admin_success_message(field)
+    await _notify_event_update(message, state, event, success_notice, show_to_moderator=False)
     await state.update_data(edit_stack=["actions"], edit_field=None)
     await state.set_state(EditEventState.selecting_field)
-    await _send_prompt_text(
-        message,
-        state,
-        t("edit.event_options_prompt"),
-        manage_event_actions_keyboard(event_id),
-    )
+    await _send_admin_success_prompt(message, state, admin_notice, event_id)
     await safe_delete(message)
 
 
@@ -740,39 +756,87 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
     images = list(data.get("new_image_file_ids", []))
     if message.photo:
         if len(images) >= MAX_EVENT_IMAGES:
+            dirty = data.get("images_dirty", False)
             await _update_prompt_message(
                 message,
                 state,
                 t("edit.image_limit_reached", limit=MAX_EVENT_IMAGES),
-                edit_images_keyboard(),
+                edit_images_keyboard(len(images) > 0, dirty),
             )
             await safe_delete(message)
             return
         images.append(message.photo[-1].file_id)
-        await state.update_data(new_image_file_ids=images)
+        await state.update_data(new_image_file_ids=images, images_dirty=True)
         await _render_edit_image_prompt(message, state)
         await safe_delete(message)
         return
     text_raw = (message.text or "").strip()
     lowered = text_raw.lower()
     if lowered in {"очистить", "clear"}:
-        images = []
-        await state.update_data(new_image_file_ids=images)
+        data = await state.get_data()
+        event_id = data.get("edit_event_id")
+        if not event_id:
+            await message.answer(t("error.context_lost_alert"), reply_markup=moderator_settings_keyboard())
+            await state.clear()
+            await safe_delete(message)
+            return
+        services = get_services()
+        event = await services.events.update_event(event_id, {"image_file_ids": []})
+        if event is None:
+            await _send_prompt_text(
+                message,
+                state,
+                t("error.save_failed"),
+                moderator_settings_keyboard(),
+            )
+            await safe_delete(message)
+            await state.clear()
+            return
+        await state.update_data(new_image_file_ids=[], images_dirty=False)
         await _update_prompt_message(
             message,
             state,
-            t("edit.images_cleared"),
-            edit_images_keyboard(),
+            t("edit.images_cleared", limit=MAX_EVENT_IMAGES, count=0),
+            edit_images_keyboard(False, False),
         )
         await safe_delete(message)
         return
+    dirty = data.get("images_dirty", False)
     await _update_prompt_message(
         message,
         state,
         t("edit.image_invalid"),
-        edit_images_keyboard(),
+        edit_images_keyboard(len(images) > 0, dirty),
     )
     await safe_delete(message)
+
+
+@router.callback_query(F.data == EDIT_EVENT_CLEAR_IMAGES)
+async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state != EditEventState.image_upload.state:
+        await callback.answer()
+        return
+    data = await state.get_data()
+    event_id = data.get("edit_event_id")
+    if not event_id:
+        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await state.clear()
+        return
+    services = get_services()
+    event = await services.events.update_event(event_id, {"image_file_ids": []})
+    if event is None:
+        await callback.answer(t("error.save_failed"), show_alert=True)
+        return
+    await state.update_data(new_image_file_ids=[], images_dirty=False)
+    if callback.message:
+        await _update_prompt_message(
+            callback.message,
+            state,
+            t("edit.images_cleared", limit=MAX_EVENT_IMAGES, count=0),
+            edit_images_keyboard(False, False),
+        )
+    await callback.answer()
 
 
 @router.callback_query(F.data == EDIT_EVENT_SAVE)
@@ -797,13 +861,10 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
             await safe_delete(callback.message)
-            await _notify_event_update(callback.message, state, event, t("edit.reminders_saved"))
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("edit.event_options_prompt"),
-                manage_event_actions_keyboard(event_id),
-            )
+            success_notice = t("edit.reminders_saved")
+            admin_notice = _admin_success_message("reminders")
+            await _notify_event_update(callback.message, state, event, success_notice, show_to_moderator=False)
+            await _send_admin_success_prompt(callback.message, state, admin_notice, event_id)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
         await callback.answer()
@@ -817,19 +878,22 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
             await safe_delete(callback.message)
+            success_notice = t("edit.images_saved")
+            admin_notice = _admin_success_message("image")
             await _notify_event_update(
                 callback.message,
                 state,
                 event,
-                t("edit.images_saved"),
+                success_notice,
+                show_to_moderator=False,
             )
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("edit.event_options_prompt"),
-                manage_event_actions_keyboard(event_id),
-            )
-        await state.update_data(edit_stack=["actions"], new_image_file_ids=[], edit_field=None)
+            await _send_admin_success_prompt(callback.message, state, admin_notice, event_id)
+        await state.update_data(
+            edit_stack=["actions"],
+            new_image_file_ids=[],
+            edit_field=None,
+            images_dirty=False,
+        )
         await state.set_state(EditEventState.selecting_field)
         await callback.answer()
         return
@@ -950,11 +1014,36 @@ async def _render_create_image_prompt(message: Message, state: FSMContext) -> No
 async def _render_edit_image_prompt(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     count = len(data.get("new_image_file_ids", []))
+    dirty = data.get("images_dirty", False)
     await _update_prompt_message(
         message,
         state,
         t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=count),
-        edit_images_keyboard(),
+        edit_images_keyboard(count > 0, dirty),
+    )
+
+
+def _admin_success_message(field: str) -> str:
+    mapping = {
+        "title": t("edit.success.title"),
+        "date": t("edit.success.date"),
+        "time": t("edit.success.time"),
+        "place": t("edit.success.place"),
+        "description": t("edit.success.description"),
+        "cost": t("edit.success.cost"),
+        "image": t("edit.success.image"),
+        "limit": t("edit.success.limit"),
+        "reminders": t("edit.success.reminders"),
+    }
+    return mapping.get(field, t("edit.success.description"))
+
+
+async def _send_admin_success_prompt(message: Message, state: FSMContext, text: str, event_id: int) -> None:
+    await _send_prompt_text(
+        message,
+        state,
+        text,
+        manage_event_actions_keyboard(event_id),
     )
 
 
@@ -1012,15 +1101,16 @@ async def _notify_new_event(callback: CallbackQuery, event: Event) -> None:
             continue
 
 
-async def _notify_event_update(message: Message, state: FSMContext, event: Event, notice: str) -> None:
+async def _notify_event_update(message: Message, state: FSMContext, event: Event, notice: str, show_to_moderator: bool = True) -> None:
     await _clear_notice_message(state, message.bot)
-    notice_message = await message.answer(notice)
-    await state.update_data(
-        **{
-            NOTICE_KEY: notice_message.message_id,
-            NOTICE_CHAT_KEY: notice_message.chat.id,
-        }
-    )
+    if show_to_moderator:
+        notice_message = await message.answer(notice)
+        await state.update_data(
+            **{
+                NOTICE_KEY: notice_message.message_id,
+                NOTICE_CHAT_KEY: notice_message.chat.id,
+            }
+        )
     services = get_services()
     bot = message.bot
     telegram_ids = await services.registrations.list_participant_telegram_ids(event.id)

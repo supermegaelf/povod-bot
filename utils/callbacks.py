@@ -25,6 +25,7 @@ EDIT_EVENT_CANCEL = "edit:cancel"
 EDIT_EVENT_SAVE = "edit:save"
 EDIT_EVENT_CANCEL_EVENT_PREFIX = "edit:cancel:event:"
 EDIT_EVENT_CONFIRM_CANCEL_PREFIX = "edit:confirm_cancel:"
+EDIT_EVENT_CLEAR_IMAGES = "edit:images:clear"
 
 
 def event_view(event_id: int) -> str:
