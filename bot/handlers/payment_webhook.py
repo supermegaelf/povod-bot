@@ -115,6 +115,13 @@ async def yookassa_webhook_handler(request: Request) -> Response:
         logger.info(f"Payment {payment_id} status: {payment.status}")
 
         if payment.status == "succeeded":
+            participants = await services.registrations.list_participants(payment.event_id)
+            is_already_registered = any(p.user_id == payment.user_id for p in participants)
+            
+            if is_already_registered:
+                logger.info(f"Participant {payment.user_id} already registered for event {payment.event_id}, skipping processing")
+                return web.json_response({"status": "ok"})
+            
             logger.info(f"Payment succeeded, registering participant for event {payment.event_id}, user {payment.user_id}")
             
             await services.registrations.add_participant(payment.event_id, payment.user_id)
