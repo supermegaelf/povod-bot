@@ -1,13 +1,15 @@
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
 
 from keyboards import (
     back_to_main_keyboard,
     event_card_keyboard,
     event_list_keyboard,
+    payment_method_keyboard,
 )
 from utils.callbacks import (
     EVENT_BACK_TO_LIST,
+    EVENT_PAYMENT_METHOD_PREFIX,
     EVENT_PAYMENT_PREFIX,
     EVENT_VIEW_PREFIX,
     extract_event_id,
@@ -74,9 +76,91 @@ async def back_to_list(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith(EVENT_PAYMENT_PREFIX))
-async def payment_placeholder(callback: CallbackQuery) -> None:
-    await callback.answer(t("placeholder.feature_in_progress"), show_alert=True)
+@router.callback_query(
+    F.data.startswith(EVENT_PAYMENT_PREFIX) & ~F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX)
+)
+async def show_payment_methods(callback: CallbackQuery) -> None:
+    """Показывает выбор способа оплаты"""
+    services = get_services()
+    event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
+        return
+
+    if not event.cost or event.cost <= 0:
+        await callback.answer(t("payment.event_free"), show_alert=True)
+        return
+
+    text = t("payment.method_prompt")
+    markup = payment_method_keyboard(event_id)
+
+    if callback.message:
+        await safe_delete(callback.message)
+        await callback.message.answer(text, reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
+async def process_payment(callback: CallbackQuery) -> None:
+    """Создаёт платёж после выбора способа оплаты"""
+    if callback.data is None:
+        await callback.answer()
+        return
+
+    payload = callback.data.removeprefix(EVENT_PAYMENT_METHOD_PREFIX)
+    try:
+        event_id_str, method = payload.split(":", 1)
+        event_id = int(event_id_str)
+    except ValueError:
+        await callback.answer()
+        return
+
+    services = get_services()
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
+        return
+
+    if not event.cost or event.cost <= 0:
+        await callback.answer(t("payment.event_free"), show_alert=True)
+        return
+
+    # Пока поддерживаем только карты
+    if method != "card":
+        await callback.answer(t("payment.method_not_available"), show_alert=True)
+        return
+
+    tg_user = callback.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+
+    try:
+        payment_id, confirmation_url = await services.payments.create_payment(
+            event_id=event.id,
+            user_id=user.id,
+            amount=event.cost,
+            description=t("payment.description", title=event.title),
+        )
+    except Exception:
+        await callback.answer(t("payment.create_failed"), show_alert=True)
+        return
+
+    if not confirmation_url:
+        await callback.answer(t("payment.create_failed"), show_alert=True)
+        return
+
+    text = t("payment.prompt", amount=event.cost, title=event.title)
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t("button.payment.pay"), url=confirmation_url)],
+            [InlineKeyboardButton(text=t("button.back"), callback_data=EVENT_BACK_TO_LIST)],
+        ]
+    )
+
+    if callback.message:
+        await safe_delete(callback.message)
+        await callback.message.answer(text, reply_markup=markup)
+    await callback.answer()
 
 
 def _remember_media_group(anchor: Message, media_messages: list[Message]) -> None:

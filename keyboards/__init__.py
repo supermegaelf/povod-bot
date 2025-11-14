@@ -1,4 +1,4 @@
-from .event_card import event_card_keyboard, event_list_keyboard
+from .event_card import event_card_keyboard, event_list_keyboard, payment_method_keyboard
 from .main_menu import back_to_main_keyboard, main_menu_keyboard
 from .settings import (
     cancel_event_keyboard,
@@ -18,6 +18,7 @@ from .settings import (
 __all__ = [
     "event_card_keyboard",
     "event_list_keyboard",
+    "payment_method_keyboard",
     "back_to_main_keyboard",
     "main_menu_keyboard",
     "moderator_settings_keyboard",

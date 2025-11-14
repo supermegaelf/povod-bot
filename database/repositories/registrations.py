@@ -71,3 +71,11 @@ class RegistrationRepository:
         """
         await self._pool.execute(query, event_id, user_id)
 
+    async def add_participant(self, event_id: int, user_id: int, status: str = STATUS_GOING) -> None:
+        query = """
+        INSERT INTO registrations (event_id, user_id, status)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (event_id, user_id) DO UPDATE SET status = $3
+        """
+        await self._pool.execute(query, event_id, user_id, status)
+
