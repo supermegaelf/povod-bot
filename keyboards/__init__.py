@@ -12,6 +12,7 @@ from .settings import (
     manage_event_actions_keyboard,
     manage_events_keyboard,
     moderator_settings_keyboard,
+    participants_keyboard,
 )
 
 __all__ = [
@@ -25,11 +26,12 @@ __all__ = [
     "create_preview_keyboard",
     "manage_events_keyboard",
     "manage_event_actions_keyboard",
+    "participants_keyboard",
+    "cancel_event_keyboard",
     "edit_field_choice_keyboard",
     "edit_images_keyboard",
     "edit_step_keyboard",
     "edit_reminders_keyboard",
-    "cancel_event_keyboard",
 ]
 
 

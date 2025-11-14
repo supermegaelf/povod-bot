@@ -12,6 +12,13 @@ class RegistrationStats:
     not_going: int
 
 
+@dataclass(frozen=True)
+class Participant:
+    user_id: int
+    telegram_id: Optional[int]
+    username: Optional[str]
+
+
 class RegistrationRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
@@ -38,4 +45,29 @@ class RegistrationRepository:
         """
         rows = await self._pool.fetch(query, event_id, status)
         return [row["telegram_id"] for row in rows]
+
+    async def list_participants(self, event_id: int) -> list[Participant]:
+        query = """
+        SELECT u.id AS user_id, u.telegram_id, u.username
+        FROM registrations AS r
+        JOIN users AS u ON u.id = r.user_id
+        WHERE r.event_id = $1 AND r.status = $2
+        ORDER BY r.registered_at ASC
+        """
+        rows = await self._pool.fetch(query, event_id, STATUS_GOING)
+        return [
+            Participant(
+                user_id=row["user_id"],
+                telegram_id=row["telegram_id"],
+                username=row["username"],
+            )
+            for row in rows
+        ]
+
+    async def remove_participant(self, event_id: int, user_id: int) -> None:
+        query = """
+        DELETE FROM registrations
+        WHERE event_id = $1 AND user_id = $2
+        """
+        await self._pool.execute(query, event_id, user_id)
 

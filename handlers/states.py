@@ -21,4 +21,6 @@ class EditEventState(StatesGroup):
     reminders = State()
     confirmation = State()
     image_upload = State()
+    participants = State()
+    broadcast = State()
 

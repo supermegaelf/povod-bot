@@ -3,7 +3,11 @@ from typing import Optional
 
 from database.pool import get_pool
 
-from database.repositories.registrations import RegistrationRepository, RegistrationStats
+from database.repositories.registrations import (
+    Participant,
+    RegistrationRepository,
+    RegistrationStats,
+)
 from utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
@@ -31,6 +35,12 @@ class RegistrationService:
 
     async def list_participant_telegram_ids(self, event_id: int, status: str = STATUS_GOING) -> list[int]:
         return await self._repository.list_participant_telegram_ids(event_id, status)
+
+    async def list_participants(self, event_id: int) -> list[Participant]:
+        return await self._repository.list_participants(event_id)
+
+    async def remove_participant(self, event_id: int, user_id: int) -> None:
+        await self._repository.remove_participant(event_id, user_id)
 
 
 def build_registration_service() -> RegistrationService:

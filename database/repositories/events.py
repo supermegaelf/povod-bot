@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, datetime, time
 from typing import Optional, Sequence, Tuple
 
 import asyncpg
@@ -21,6 +21,8 @@ class Event:
     max_participants: Optional[int]
     reminder_3days: bool
     reminder_1day: bool
+    reminder_3days_sent_at: Optional[datetime]
+    reminder_1day_sent_at: Optional[datetime]
     status: str
 
 
@@ -31,7 +33,7 @@ class EventRepository:
     async def list_active(self, limit: int = 5) -> Sequence[Event]:
         query = """
         SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
-               max_participants, reminder_3days, reminder_1day, status
+               max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
         FROM events
         WHERE status = 'active'
         ORDER BY date ASC, time ASC
@@ -43,10 +45,27 @@ class EventRepository:
             await self._populate_images(connection, events)
             return events
 
+    async def list_reminder_candidates(self) -> Sequence[Event]:
+        query = """
+        SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
+               max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
+        FROM events
+        WHERE status = 'active'
+          AND (
+            (reminder_3days = TRUE AND reminder_3days_sent_at IS NULL)
+            OR (reminder_1day = TRUE AND reminder_1day_sent_at IS NULL)
+          )
+        """
+        async with self._pool.acquire() as connection:
+            records = await connection.fetch(query)
+            events = [self._to_event(record) for record in records]
+            await self._populate_images(connection, events)
+            return events
+
     async def get(self, event_id: int) -> Optional[Event]:
         query = """
         SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
-               max_participants, reminder_3days, reminder_1day, status
+               max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
         FROM events
         WHERE id = $1
         """
@@ -61,10 +80,11 @@ class EventRepository:
     async def create(self, data: dict) -> Event:
         query = """
         INSERT INTO events (title, date, time, end_date, end_time, place, description, cost, image_file_id,
-                            max_participants, reminder_3days, reminder_1day, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                            max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at,
+                            reminder_1day_sent_at, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
-                  max_participants, reminder_3days, reminder_1day, status
+                  max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
         """
         raw_images = data.get("image_file_ids")
         images: Tuple[str, ...] = tuple(raw_images) if raw_images else ()
@@ -89,6 +109,8 @@ class EventRepository:
                     data.get("max_participants"),
                     data.get("reminder_3days", False),
                     data.get("reminder_1day", False),
+                    data.get("reminder_3days_sent_at"),
+                    data.get("reminder_1day_sent_at"),
                     data.get("status", "active"),
                 )
                 event = self._to_event(record)
@@ -124,7 +146,7 @@ class EventRepository:
         SET {placeholders}
         WHERE id = ${len(values)}
         RETURNING id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
-                  max_participants, reminder_3days, reminder_1day, status
+                  max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
         """
         async with self._pool.acquire() as connection:
             async with connection.transaction():
@@ -153,6 +175,8 @@ class EventRepository:
             max_participants=record["max_participants"],
             reminder_3days=record["reminder_3days"],
             reminder_1day=record["reminder_1day"],
+            reminder_3days_sent_at=record["reminder_3days_sent_at"],
+            reminder_1day_sent_at=record["reminder_1day_sent_at"],
             status=record["status"],
         )
 
