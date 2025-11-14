@@ -73,8 +73,44 @@ async def yookassa_webhook_handler(request: Request) -> Response:
         payment = await services.payments.handle_webhook(payment_id)
 
         if payment is None:
-            logger.warning(f"Payment {payment_id} not found in database")
-            return web.json_response({"status": "error", "message": "payment not found"}, status=404)
+            logger.warning(f"Payment {payment_id} not found in database, trying to create from webhook data")
+            metadata = payment_object.get("metadata", {})
+            event_id_str = metadata.get("event_id")
+            user_id_str = metadata.get("user_id")
+            
+            if event_id_str and user_id_str:
+                try:
+                    event_id = int(event_id_str)
+                    user_id = int(user_id_str)
+                    amount_value = payment_object.get("amount", {}).get("value", "0")
+                    amount = float(amount_value)
+                    confirmation_url = None
+                    confirmation = payment_object.get("confirmation")
+                    if confirmation:
+                        confirmation_url = confirmation.get("confirmation_url")
+                    
+                    logger.info(f"Creating payment from webhook: payment_id={payment_id}, event_id={event_id}, user_id={user_id}, amount={amount}")
+                    from bot.database.repositories.payments import PaymentRepository
+                    from bot.database.pool import get_pool
+                    pool = get_pool()
+                    repo = PaymentRepository(pool)
+                    await repo.create(
+                        payment_id=payment_id,
+                        event_id=event_id,
+                        user_id=user_id,
+                        amount=amount,
+                        confirmation_url=confirmation_url,
+                        payment_message_id=None,
+                    )
+                    logger.info(f"Payment created from webhook data: {payment_id}")
+                    payment = await services.payments.handle_webhook(payment_id)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Failed to create payment from webhook data: {e}")
+                    return web.json_response({"status": "error", "message": "invalid metadata"}, status=400)
+            
+            if payment is None:
+                logger.warning(f"Payment {payment_id} not found in database and could not be created from webhook")
+                return web.json_response({"status": "error", "message": "payment not found"}, status=404)
 
         logger.info(f"Payment {payment_id} status: {payment.status}")
 

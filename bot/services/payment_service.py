@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 from typing import Optional
 from uuid import uuid4
@@ -8,6 +9,8 @@ from yookassa import Configuration, Payment
 from config import YooKassaConfig
 from bot.database.pool import get_pool
 from bot.database.repositories.payments import Payment as PaymentModel, PaymentRepository
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentService:
@@ -48,6 +51,7 @@ class PaymentService:
         payment_id = payment.id
         confirmation_url = payment.confirmation.confirmation_url if payment.confirmation else None
 
+        logger.info(f"Creating payment in database: payment_id={payment_id}, event_id={event_id}, user_id={user_id}, amount={amount}")
         await self._repository.create(
             payment_id=payment_id,
             event_id=event_id,
@@ -56,6 +60,7 @@ class PaymentService:
             confirmation_url=confirmation_url,
             payment_message_id=payment_message_id,
         )
+        logger.info(f"Payment created successfully in database: {payment_id}")
 
         return payment_id, confirmation_url
 
