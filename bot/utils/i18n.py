@@ -8,7 +8,7 @@ DEFAULT_LOCALE = os.getenv("BOT_LOCALE", "ru")
 
 @lru_cache()
 def _load_locale(locale: str) -> dict[str, str]:
-    base_path = Path(__file__).resolve().parent.parent
+    base_path = Path(__file__).resolve().parent.parent.parent
     locale_path = base_path / "locales" / f"{locale}.json"
     if not locale_path.exists():
         raise FileNotFoundError(f"Locale file not found: {locale_path}")
