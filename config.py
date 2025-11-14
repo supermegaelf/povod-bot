@@ -45,12 +45,20 @@ class ReminderConfig:
 
 
 @dataclass(frozen=True)
+class YooKassaConfig:
+    api_key: str
+    shop_id: str
+    webhook_url: str
+
+
+@dataclass(frozen=True)
 class Config:
     bot: BotConfig
     database: DatabaseConfig
     community: CommunityLinks
     support: SupportLinks
     reminders: ReminderConfig
+    yookassa: YooKassaConfig
 
 
 def _parse_admin_ids(raw: str | None) -> Sequence[int]:
@@ -88,12 +96,18 @@ def load_config() -> Config:
         rule_3=_parse_reminder_rule(prefix="3", default_days=3),
         rule_1=_parse_reminder_rule(prefix="1", default_days=1),
     )
+    yookassa = YooKassaConfig(
+        api_key=_require_env("YOOKASSA_API_KEY"),
+        shop_id=_require_env("YOOKASSA_SHOP_ID"),
+        webhook_url=_require_env("YOOKASSA_WEBHOOK_URL"),
+    )
     return Config(
         bot=BotConfig(token=token, admin_ids=admin_ids),
         database=DatabaseConfig(dsn=dsn),
         community=community,
         support=support,
         reminders=reminders,
+        yookassa=yookassa,
     )
 
 

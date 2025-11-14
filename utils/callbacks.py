@@ -7,6 +7,7 @@ SETTINGS_MANAGE_EVENTS = "settings:manage"
 
 EVENT_VIEW_PREFIX = "event:view:"
 EVENT_PAYMENT_PREFIX = "event:payment:"
+EVENT_PAYMENT_METHOD_PREFIX = "event:payment:method:"
 EVENT_BACK_TO_LIST = "event:back:list"
 
 CREATE_EVENT_BACK = "create:back"
@@ -36,6 +37,10 @@ def event_view(event_id: int) -> str:
 
 def event_payment(event_id: int) -> str:
     return f"{EVENT_PAYMENT_PREFIX}{event_id}"
+
+
+def event_payment_method(event_id: int, method: str) -> str:
+    return f"{EVENT_PAYMENT_METHOD_PREFIX}{event_id}:{method}"
 
 
 def edit_event(event_id: int) -> str:

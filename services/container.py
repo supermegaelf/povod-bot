@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from config import Config
 from .event_service import EventService, build_event_service
+from .payment_service import PaymentService, build_payment_service
 from .registration_service import RegistrationService, build_registration_service
 from .reminder_service import ReminderService, build_reminder_service
 from .user_service import UserService, build_user_service
@@ -13,6 +14,7 @@ class ServiceContainer:
     events: EventService
     registrations: RegistrationService
     reminders: ReminderService
+    payments: PaymentService
 
 
 def build_services(config: Config) -> ServiceContainer:
@@ -20,10 +22,12 @@ def build_services(config: Config) -> ServiceContainer:
     events = build_event_service()
     registrations = build_registration_service()
     reminders = build_reminder_service(events, registrations, config.reminders)
+    payments = build_payment_service(config.yookassa)
     return ServiceContainer(
         users=users,
         events=events,
         registrations=registrations,
         reminders=reminders,
+        payments=payments,
     )
 
