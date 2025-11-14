@@ -9,10 +9,10 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 
-from database.repositories.events import Event
-from database.repositories.registrations import RegistrationStats
-from handlers.states import CreateEventState, EditEventState
-from keyboards import (
+from bot.database.repositories.events import Event
+from bot.database.repositories.registrations import RegistrationStats
+from bot.handlers.states import CreateEventState, EditEventState
+from bot.keyboards import (
     cancel_event_keyboard,
     create_preview_keyboard,
     create_reminders_keyboard,
@@ -26,7 +26,7 @@ from keyboards import (
     moderator_settings_keyboard,
     participants_keyboard,
 )
-from utils.callbacks import (
+from bot.utils.callbacks import (
     CREATE_EVENT_BACK,
     CREATE_EVENT_CANCEL,
     CREATE_EVENT_IMAGES_CONFIRM,
@@ -50,11 +50,11 @@ from utils.callbacks import (
     extract_event_id,
     extract_event_id_and_field,
 )
-from utils.di import get_services
-from utils.formatters import format_event_card
-from utils.constants import MAX_EVENT_IMAGES
-from utils.messaging import safe_delete, safe_delete_message, safe_delete_by_id
-from utils.i18n import t
+from bot.utils.di import get_services
+from bot.utils.formatters import format_event_card
+from bot.utils.constants import MAX_EVENT_IMAGES
+from bot.utils.messaging import safe_delete, safe_delete_message, safe_delete_by_id
+from bot.utils.i18n import t
 
 router = Router()
 

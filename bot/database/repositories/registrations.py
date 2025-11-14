@@ -3,7 +3,7 @@ from typing import Optional
 
 import asyncpg
 
-from utils.constants import STATUS_GOING, STATUS_NOT_GOING
+from bot.utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
 @dataclass(frozen=True)

@@ -1,11 +1,11 @@
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from keyboards import back_to_main_keyboard, event_list_keyboard, moderator_settings_keyboard
-from utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS
-from utils.di import get_config, get_services
-from utils.i18n import t
-from utils.messaging import safe_delete
+from bot.keyboards import back_to_main_keyboard, event_list_keyboard, moderator_settings_keyboard
+from bot.utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS
+from bot.utils.di import get_config, get_services
+from bot.utils.i18n import t
+from bot.utils.messaging import safe_delete
 
 router = Router()
 

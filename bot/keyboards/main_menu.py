@@ -1,7 +1,7 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS, START_MAIN_MENU
-from utils.i18n import t
+from bot.utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS, START_MAIN_MENU
+from bot.utils.i18n import t
 
 
 def main_menu_keyboard(show_settings: bool):

@@ -5,11 +5,11 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot
 
 from config import ReminderConfig
-from database.repositories.events import Event
-from services.event_service import EventService
-from services.registration_service import RegistrationService
-from utils.formatters import format_event_card
-from utils.i18n import t
+from bot.database.repositories.events import Event
+from bot.services.event_service import EventService
+from bot.services.registration_service import RegistrationService
+from bot.utils.formatters import format_event_card
+from bot.utils.i18n import t
 
 
 @dataclass(frozen=True)

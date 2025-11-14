@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from database.pool import get_pool
+from bot.database.pool import get_pool
 
-from database.repositories.registrations import (
+from bot.database.repositories.registrations import (
     Participant,
     RegistrationRepository,
     RegistrationStats,
 )
-from utils.constants import STATUS_GOING, STATUS_NOT_GOING
+from bot.utils.constants import STATUS_GOING, STATUS_NOT_GOING
 
 
 @dataclass(frozen=True)

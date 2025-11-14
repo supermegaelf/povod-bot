@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from utils.callbacks import (
+from bot.utils.callbacks import (
     CREATE_EVENT_BACK,
     CREATE_EVENT_IMAGES_CONFIRM,
     CREATE_EVENT_SKIP,
@@ -23,7 +23,7 @@ from utils.callbacks import (
     edit_event_field,
     participant_remove,
 )
-from utils.i18n import t
+from bot.utils.i18n import t
 
 
 def moderator_settings_keyboard():

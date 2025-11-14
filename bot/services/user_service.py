@@ -1,8 +1,8 @@
 from typing import Optional, Sequence
 
-from database.pool import get_pool
-from database.repositories.users import User, UserRepository
-from utils.constants import ROLE_ADMIN, ROLE_MODERATOR, ROLE_USER
+from bot.database.pool import get_pool
+from bot.database.repositories.users import User, UserRepository
+from bot.utils.constants import ROLE_ADMIN, ROLE_MODERATOR, ROLE_USER
 
 
 class UserService:

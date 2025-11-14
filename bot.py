@@ -9,11 +9,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from zoneinfo import ZoneInfo
 
 from config import load_config
-from database import close_pool, init_pool, run_schema_setup
-from handlers import setup as setup_handlers
-from handlers.payment_webhook import setup_webhook_app
-from services.container import build_services
-from utils.di import set_config, set_services
+from bot.database import close_pool, init_pool, run_schema_setup
+from bot.handlers import setup as setup_handlers
+from bot.handlers.payment_webhook import setup_webhook_app
+from bot.services.container import build_services
+from bot.utils.di import set_config, set_services
 
 
 async def main() -> None:
