@@ -157,9 +157,13 @@ async def process_payment(callback: CallbackQuery) -> None:
         ]
     )
 
+    payment_message = None
     if callback.message:
         await safe_delete(callback.message)
-        await callback.message.answer(text, reply_markup=markup)
+        payment_message = await callback.message.answer(text, reply_markup=markup)
+        
+        if payment_message:
+            await services.payments.update_message_id(payment_id, payment_message.message_id)
     await callback.answer()
 
 
