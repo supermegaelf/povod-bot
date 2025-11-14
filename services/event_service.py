@@ -23,6 +23,9 @@ class EventService:
     async def cancel_event(self, event_id: int) -> Event | None:
         return await self._repository.update(event_id, {"status": "cancelled"})
 
+    async def list_reminder_candidates(self) -> Sequence[Event]:
+        return await self._repository.list_reminder_candidates()
+
 
 def build_event_service() -> EventService:
     pool = get_pool()

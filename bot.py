@@ -4,6 +4,8 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from zoneinfo import ZoneInfo
 
 from config import load_config
 from database import close_pool, init_pool, run_schema_setup
@@ -23,9 +25,17 @@ async def main() -> None:
     bot = Bot(token=config.bot.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     setup_handlers(dp)
+    scheduler: AsyncIOScheduler | None = None
     try:
+        scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Moscow"))
+        async def reminders_job() -> None:
+            await services.reminders.process_due_reminders(bot)
+        scheduler.add_job(reminders_job, "cron", minute="*/5", id="reminders")
+        scheduler.start()
         await dp.start_polling(bot)
     finally:
+        if scheduler:
+            scheduler.shutdown(wait=False)
         await close_pool()
         await bot.session.close()
 
