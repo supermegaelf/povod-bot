@@ -32,10 +32,17 @@ async def show_event(callback: CallbackQuery) -> None:
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
+    
+    tg_user = callback.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+    is_paid = False
+    if event.cost and event.cost > 0:
+        is_paid = await services.payments.has_successful_payment(event.id, user.id)
+    
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
-    markup = event_card_keyboard(event.id)
+    markup = event_card_keyboard(event.id, is_paid=is_paid)
     if callback.message:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
@@ -80,7 +87,6 @@ async def back_to_list(callback: CallbackQuery) -> None:
     F.data.startswith(EVENT_PAYMENT_PREFIX) & ~F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX)
 )
 async def show_payment_methods(callback: CallbackQuery) -> None:
-    """Показывает выбор способа оплаты"""
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
     event = await services.events.get_event(event_id)
@@ -126,13 +132,16 @@ async def process_payment(callback: CallbackQuery) -> None:
         await callback.answer(t("payment.event_free"), show_alert=True)
         return
 
-    # Пока поддерживаем только карты
+    tg_user = callback.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+    is_paid = await services.payments.has_successful_payment(event.id, user.id)
+    if is_paid:
+        await callback.answer(t("payment.already_paid"), show_alert=True)
+        return
+
     if method != "card":
         await callback.answer(t("payment.method_not_available"), show_alert=True)
         return
-
-    tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
 
     try:
         payment_id, confirmation_url = await services.payments.create_payment(

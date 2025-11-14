@@ -65,6 +65,9 @@ class PaymentService:
     async def update_message_id(self, payment_id: str, message_id: int) -> None:
         await self._repository.update_message_id(payment_id, message_id)
 
+    async def has_successful_payment(self, event_id: int, user_id: int) -> bool:
+        return await self._repository.has_successful_payment(event_id, user_id)
+
     async def handle_webhook(self, payment_id: str) -> Optional[PaymentModel]:
         try:
             loop = asyncio.get_event_loop()

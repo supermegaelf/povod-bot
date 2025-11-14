@@ -20,10 +20,11 @@ def event_list_keyboard(events):
     return builder.as_markup()
 
 
-def event_card_keyboard(event_id: int):
+def event_card_keyboard(event_id: int, is_paid: bool = False):
     builder = InlineKeyboardBuilder()
     config = get_config()
-    builder.button(text=t("button.event.pay"), callback_data=event_payment(event_id))
+    if not is_paid:
+        builder.button(text=t("button.event.pay"), callback_data=event_payment(event_id))
     builder.button(text=t("button.event.ask_question"), url=config.support.question_url)
     builder.button(text=t("button.back"), callback_data=EVENT_BACK_TO_LIST)
     builder.adjust(1)

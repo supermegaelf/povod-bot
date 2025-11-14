@@ -35,6 +35,7 @@
   "payment.event_free": "Это мероприятие бесплатное.",
   "payment.create_failed": "Не удалось создать платёж. Попробуйте позже.",
   "payment.method_not_available": "Этот способ оплаты пока недоступен.",
+  "payment.already_paid": "Вы уже оплатили это мероприятие.",
   "payment.success": "Оплата успешно завершена! Вы записаны на мероприятие «{title}» ✅",
   "format.input_datetime": "%d.%m.%Y %H:%M",
   "format.input_date": "%d.%m.%Y",
