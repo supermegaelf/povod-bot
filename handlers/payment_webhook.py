@@ -139,5 +139,9 @@ def setup_webhook_app() -> web.Application:
     app.router.add_get("/yookassa_payment", health_check_handler)
     app.router.add_post("/yookassa_payment", yookassa_webhook_handler)
     logger.info("Webhook routes registered: GET /yookassa_payment, POST /yookassa_payment")
+    
+    access_logger = logging.getLogger("aiohttp.access")
+    access_logger.setLevel(logging.WARNING)
+    
     return app
 
