@@ -35,14 +35,15 @@ async def show_event(callback: CallbackQuery) -> None:
     
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username)
+    is_paid_event = bool(event.cost and event.cost > 0)
     is_paid = False
-    if event.cost and event.cost > 0:
+    if is_paid_event:
         is_paid = await services.payments.has_successful_payment(event.id, user.id)
     
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
-    markup = event_card_keyboard(event.id, is_paid=is_paid)
+    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event)
     if callback.message:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
