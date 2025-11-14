@@ -1,14 +1,14 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from utils.callbacks import (
+from bot.utils.callbacks import (
     EVENT_BACK_TO_LIST,
     START_MAIN_MENU,
     event_payment,
     event_payment_method,
     event_view,
 )
-from utils.di import get_config
-from utils.i18n import t
+from bot.utils.di import get_config
+from bot.utils.i18n import t
 
 
 def event_list_keyboard(events):

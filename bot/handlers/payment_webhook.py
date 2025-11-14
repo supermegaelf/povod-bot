@@ -6,9 +6,9 @@ from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 
 from config import load_config
-from database import close_pool, init_pool, run_schema_setup
-from services.container import build_services
-from utils.di import set_config, set_services
+from bot.database import close_pool, init_pool, run_schema_setup
+from bot.services.container import build_services
+from bot.utils.di import set_config, set_services
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ async def yookassa_webhook_handler(request: Request) -> Response:
     
     try:
         await _ensure_services_initialized()
-        from utils.di import get_services
+        from bot.utils.di import get_services
 
         try:
             data = await request.json()
@@ -89,9 +89,9 @@ async def yookassa_webhook_handler(request: Request) -> Response:
                 if user and user.telegram_id:
                     from aiogram import Bot
                     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-                    from utils.callbacks import event_view
-                    from utils.di import get_config
-                    from utils.i18n import t
+                    from bot.utils.callbacks import event_view
+                    from bot.utils.di import get_config
+                    from bot.utils.i18n import t
 
                     config = get_config()
                     bot = Bot(token=config.bot.token)

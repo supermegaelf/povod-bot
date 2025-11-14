@@ -1,13 +1,13 @@
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
 
-from keyboards import (
+from bot.keyboards import (
     back_to_main_keyboard,
     event_card_keyboard,
     event_list_keyboard,
     payment_method_keyboard,
 )
-from utils.callbacks import (
+from bot.utils.callbacks import (
     EVENT_BACK_TO_LIST,
     EVENT_PAYMENT_METHOD_PREFIX,
     EVENT_PAYMENT_PREFIX,
@@ -15,10 +15,10 @@ from utils.callbacks import (
     event_payment,
     extract_event_id,
 )
-from utils.di import get_services
-from utils.formatters import format_event_card
-from utils.i18n import t
-from utils.messaging import safe_delete, safe_delete_by_id
+from bot.utils.di import get_services
+from bot.utils.formatters import format_event_card
+from bot.utils.i18n import t
+from bot.utils.messaging import safe_delete, safe_delete_by_id
 
 router = Router()
 

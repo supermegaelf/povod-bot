@@ -1,9 +1,9 @@
 from decimal import Decimal, ROUND_HALF_UP
 import textwrap
 
-from database.repositories.events import Event
-from services.registration_service import Availability
-from utils.i18n import t
+from bot.database.repositories.events import Event
+from bot.services.registration_service import Availability
+from bot.utils.i18n import t
 
 
 def format_event_card(event: Event, availability: Availability | None = None) -> str:

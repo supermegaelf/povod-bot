@@ -4,11 +4,11 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
-from keyboards import main_menu_keyboard
-from utils.callbacks import START_MAIN_MENU
-from utils.di import get_services
-from utils.messaging import safe_delete
-from utils.i18n import t
+from bot.keyboards import main_menu_keyboard
+from bot.utils.callbacks import START_MAIN_MENU
+from bot.utils.di import get_services
+from bot.utils.messaging import safe_delete
+from bot.utils.i18n import t
 
 router = Router()
 

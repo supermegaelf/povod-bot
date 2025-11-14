@@ -1,7 +1,7 @@
 from typing import Optional
 
 from config import Config
-from services.container import ServiceContainer
+from bot.services.container import ServiceContainer
 
 _config: Optional[Config] = None
 _services: Optional[ServiceContainer] = None

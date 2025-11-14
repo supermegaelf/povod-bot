@@ -1,7 +1,7 @@
 from typing import Sequence
 
-from database.pool import get_pool
-from database.repositories.events import Event, EventRepository
+from bot.database.pool import get_pool
+from bot.database.repositories.events import Event, EventRepository
 
 
 class EventService:

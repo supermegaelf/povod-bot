@@ -6,8 +6,8 @@ from uuid import uuid4
 from yookassa import Configuration, Payment
 
 from config import YooKassaConfig
-from database.pool import get_pool
-from database.repositories.payments import Payment as PaymentModel, PaymentRepository
+from bot.database.pool import get_pool
+from bot.database.repositories.payments import Payment as PaymentModel, PaymentRepository
 
 
 class PaymentService:
