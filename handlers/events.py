@@ -12,6 +12,7 @@ from utils.callbacks import (
     EVENT_PAYMENT_METHOD_PREFIX,
     EVENT_PAYMENT_PREFIX,
     EVENT_VIEW_PREFIX,
+    event_payment,
     extract_event_id,
 )
 from utils.di import get_services
@@ -163,7 +164,7 @@ async def process_payment(callback: CallbackQuery) -> None:
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("button.payment.pay"), url=confirmation_url)],
-            [InlineKeyboardButton(text=t("button.back"), callback_data=EVENT_BACK_TO_LIST)],
+            [InlineKeyboardButton(text=t("button.back"), callback_data=event_payment(event.id))],
         ]
     )
 
