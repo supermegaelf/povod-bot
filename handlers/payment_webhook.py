@@ -115,6 +115,7 @@ async def yookassa_webhook_handler(request: Request) -> Response:
 
 
 async def health_check_handler(request: Request) -> Response:
+    logger.info(f"Health check request: {request.method} {request.path_qs}")
     return web.json_response({"status": "ok"})
 
 
@@ -122,5 +123,6 @@ def setup_webhook_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/yookassa_payment", health_check_handler)
     app.router.add_post("/yookassa_payment", yookassa_webhook_handler)
+    logger.info("Webhook routes registered: GET /yookassa_payment, POST /yookassa_payment")
     return app
 
