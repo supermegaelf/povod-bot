@@ -96,10 +96,6 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
 
-    if not event.cost or event.cost <= 0:
-        await callback.answer(t("payment.event_free"), show_alert=True)
-        return
-
     text = t("payment.method_prompt")
     markup = payment_method_keyboard(event_id)
 
@@ -130,16 +126,8 @@ async def process_payment(callback: CallbackQuery) -> None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
 
-    if not event.cost or event.cost <= 0:
-        await callback.answer(t("payment.event_free"), show_alert=True)
-        return
-
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username)
-    is_paid = await services.payments.has_successful_payment(event.id, user.id)
-    if is_paid:
-        await callback.answer(t("payment.already_paid"), show_alert=True)
-        return
 
     if method != "card":
         await callback.answer(t("payment.method_not_available"), show_alert=True)
