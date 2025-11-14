@@ -88,6 +88,8 @@ async def yookassa_webhook_handler(request: Request) -> Response:
                 user = await services.users.get_by_id(payment.user_id)
                 if user and user.telegram_id:
                     from aiogram import Bot
+                    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+                    from utils.callbacks import event_view
                     from utils.di import get_config
                     from utils.i18n import t
 
@@ -95,10 +97,23 @@ async def yookassa_webhook_handler(request: Request) -> Response:
                     bot = Bot(token=config.bot.token)
                     event_obj = await services.events.get_event(payment.event_id)
                     if event_obj:
+                        if payment.payment_message_id:
+                            try:
+                                await bot.delete_message(user.telegram_id, payment.payment_message_id)
+                                logger.info(f"Deleted payment message {payment.payment_message_id}")
+                            except Exception as e:
+                                logger.warning(f"Failed to delete payment message: {e}")
+                        
                         logger.info(f"Sending success notification to user {user.telegram_id}")
+                        markup = InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [InlineKeyboardButton(text=t("button.back"), callback_data=event_view(payment.event_id))],
+                            ]
+                        )
                         await bot.send_message(
                             user.telegram_id,
                             t("payment.success", title=event_obj.title),
+                            reply_markup=markup,
                         )
                         logger.info(f"Success notification sent")
                     await bot.session.close()

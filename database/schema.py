@@ -91,8 +91,14 @@ CREATE TABLE IF NOT EXISTS payments (
     status VARCHAR(32) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
     paid_at TIMESTAMP WITHOUT TIME ZONE,
-    confirmation_url TEXT
+    confirmation_url TEXT,
+    payment_message_id INTEGER
 );
+"""
+
+ALTER_PAYMENTS_ADD_MESSAGE_ID = """
+ALTER TABLE payments
+    ADD COLUMN IF NOT EXISTS payment_message_id INTEGER;
 """
 
 STATEMENTS = (
@@ -107,5 +113,6 @@ STATEMENTS = (
     CREATE_EVENT_IMAGES,
     CREATE_REGISTRATIONS,
     CREATE_PAYMENTS,
+    ALTER_PAYMENTS_ADD_MESSAGE_ID,
 )
 

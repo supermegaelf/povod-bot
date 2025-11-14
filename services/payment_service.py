@@ -23,6 +23,7 @@ class PaymentService:
         user_id: int,
         amount: float,
         description: str,
+        payment_message_id: Optional[int] = None,
     ) -> tuple[str, Optional[str]]:
         loop = asyncio.get_event_loop()
         payment_data = {
@@ -53,12 +54,16 @@ class PaymentService:
             user_id=user_id,
             amount=amount,
             confirmation_url=confirmation_url,
+            payment_message_id=payment_message_id,
         )
 
         return payment_id, confirmation_url
 
     async def get_payment(self, payment_id: str) -> Optional[PaymentModel]:
         return await self._repository.get_by_payment_id(payment_id)
+
+    async def update_message_id(self, payment_id: str, message_id: int) -> None:
+        await self._repository.update_message_id(payment_id, message_id)
 
     async def handle_webhook(self, payment_id: str) -> Optional[PaymentModel]:
         try:

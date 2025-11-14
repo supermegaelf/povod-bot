@@ -16,6 +16,7 @@ class Payment:
     created_at: datetime
     paid_at: Optional[datetime]
     confirmation_url: Optional[str]
+    payment_message_id: Optional[int]
 
 
 class PaymentRepository:
@@ -29,20 +30,21 @@ class PaymentRepository:
         user_id: int,
         amount: float,
         confirmation_url: Optional[str] = None,
+        payment_message_id: Optional[int] = None,
     ) -> Payment:
         query = """
-        INSERT INTO payments (payment_id, event_id, user_id, amount, confirmation_url)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, payment_id, event_id, user_id, amount, status, created_at, paid_at, confirmation_url
+        INSERT INTO payments (payment_id, event_id, user_id, amount, confirmation_url, payment_message_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, payment_id, event_id, user_id, amount, status, created_at, paid_at, confirmation_url, payment_message_id
         """
         record = await self._pool.fetchrow(
-            query, payment_id, event_id, user_id, amount, confirmation_url
+            query, payment_id, event_id, user_id, amount, confirmation_url, payment_message_id
         )
         return self._to_payment(record)
 
     async def get_by_payment_id(self, payment_id: str) -> Optional[Payment]:
         query = """
-        SELECT id, payment_id, event_id, user_id, amount, status, created_at, paid_at, confirmation_url
+        SELECT id, payment_id, event_id, user_id, amount, status, created_at, paid_at, confirmation_url, payment_message_id
         FROM payments
         WHERE payment_id = $1
         """
@@ -64,6 +66,18 @@ class PaymentRepository:
         """
         await self._pool.execute(query, payment_id, status, paid_at)
 
+    async def update_message_id(
+        self,
+        payment_id: str,
+        message_id: int,
+    ) -> None:
+        query = """
+        UPDATE payments
+        SET payment_message_id = $2
+        WHERE payment_id = $1
+        """
+        await self._pool.execute(query, payment_id, message_id)
+
     def _to_payment(self, record: asyncpg.Record) -> Payment:
         return Payment(
             id=record["id"],
@@ -75,5 +89,6 @@ class PaymentRepository:
             created_at=record["created_at"],
             paid_at=record["paid_at"],
             confirmation_url=record["confirmation_url"],
+            payment_message_id=record.get("payment_message_id"),
         )
 
