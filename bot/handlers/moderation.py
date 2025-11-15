@@ -25,6 +25,7 @@ from bot.keyboards import (
     manage_event_actions_keyboard,
     manage_events_keyboard,
     moderator_settings_keyboard,
+    new_event_notification_keyboard,
 )
 from bot.utils.callbacks import (
     CREATE_EVENT_BACK,
@@ -1268,26 +1269,14 @@ async def _notify_new_event(callback: CallbackQuery, event: Event) -> None:
     services = get_services()
     bot = callback.message.bot if callback.message else callback.bot
     creator_id = callback.from_user.id if callback.from_user else None
-    stats = RegistrationStats(going=0, not_going=0)
-    availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, availability)
+    text = t("notify.new_event", title=event.title)
+    markup = new_event_notification_keyboard(event.id)
     telegram_ids = await services.users.list_all_telegram_ids()
-    images = list(event.image_file_ids)
     for telegram_id in telegram_ids:
         if creator_id and telegram_id == creator_id:
             continue
         try:
-            if images:
-                if len(images) == 1:
-                    await bot.send_photo(telegram_id, images[0], caption=text)
-                else:
-                    media = [
-                        InputMediaPhoto(media=file_id, caption=text if idx == 0 else None)
-                        for idx, file_id in enumerate(images)
-                    ]
-                    await bot.send_media_group(telegram_id, media)
-            else:
-                await bot.send_message(telegram_id, text)
+            await bot.send_message(telegram_id, text, reply_markup=markup)
         except Exception:
             continue
 
