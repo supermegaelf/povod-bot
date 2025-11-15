@@ -28,6 +28,7 @@ EDIT_EVENT_BROADCAST = "edit:event:broadcast"
 EVENT_REFUND_PREFIX = "event:refund:"
 EDIT_EVENT_CANCEL_EVENT_PREFIX = "edit:cancel:event:"
 EDIT_EVENT_CONFIRM_CANCEL_PREFIX = "edit:confirm_cancel:"
+HIDE_MESSAGE = "hide:message"
 
 
 def event_view(event_id: int) -> str:

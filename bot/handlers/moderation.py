@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, TypeVar
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
 
 from bot.database.repositories.events import Event
 from bot.database.repositories.registrations import RegistrationStats
@@ -43,6 +43,7 @@ from bot.utils.callbacks import (
     EDIT_EVENT_BROADCAST,
     EDIT_EVENT_CANCEL_EVENT_PREFIX,
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
+    HIDE_MESSAGE,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     extract_event_id,
@@ -731,11 +732,16 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
         return
     
     broadcast_text = t("moderator.broadcast_message", title=event.title, message=text)
+    broadcast_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t("button.hide"), callback_data=HIDE_MESSAGE)],
+        ]
+    )
     
     delivered = 0
     for telegram_id in telegram_ids:
         try:
-            await message.bot.send_message(telegram_id, broadcast_text)
+            await message.bot.send_message(telegram_id, broadcast_text, reply_markup=broadcast_markup)
             delivered += 1
             logger.info(f"Message delivered to {telegram_id}")
         except Exception as e:
@@ -757,6 +763,13 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
     await state.set_state(EditEventState.selecting_field)
     await _send_admin_success_prompt(message, state, success_notice, event_id)
     await safe_delete(message)
+
+
+@router.callback_query(F.data == HIDE_MESSAGE)
+async def hide_message(callback: CallbackQuery) -> None:
+    if callback.message:
+        await safe_delete(callback.message)
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CANCEL_EVENT_PREFIX))
