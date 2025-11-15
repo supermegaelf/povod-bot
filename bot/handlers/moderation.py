@@ -709,6 +709,13 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     services = get_services()
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await message.answer(t("error.event_not_found"), reply_markup=moderator_settings_keyboard())
+        await state.clear()
+        await safe_delete(message)
+        return
+    
     telegram_ids = await services.registrations.list_participant_telegram_ids(event_id)
     logger = logging.getLogger(__name__)
     logger.info(f"Broadcasting message to {len(telegram_ids)} participants for event {event_id}")
@@ -723,10 +730,12 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     
+    broadcast_text = t("moderator.broadcast_message", title=event.title, message=text)
+    
     delivered = 0
     for telegram_id in telegram_ids:
         try:
-            await message.bot.send_message(telegram_id, text)
+            await message.bot.send_message(telegram_id, broadcast_text)
             delivered += 1
             logger.info(f"Message delivered to {telegram_id}")
         except Exception as e:
