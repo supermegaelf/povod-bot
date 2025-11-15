@@ -53,7 +53,7 @@ async def show_event(callback: CallbackQuery) -> None:
         bot = callback.message.bot
         message_id = callback.message.message_id
         await _cleanup_media_group(callback.message)
-        await safe_delete_recent_bot_messages(bot, chat_id, message_id, count=10)
+        await safe_delete_recent_bot_messages(bot, chat_id, message_id, count=50)
         images = list(event.image_file_ids)
         if images:
             if len(images) == 1:
