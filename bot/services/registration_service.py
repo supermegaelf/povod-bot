@@ -45,6 +45,9 @@ class RegistrationService:
     async def add_participant(self, event_id: int, user_id: int) -> None:
         await self._repository.add_participant(event_id, user_id)
 
+    async def is_registered(self, event_id: int, user_id: int) -> bool:
+        return await self._repository.is_registered(event_id, user_id)
+
 
 def build_registration_service() -> RegistrationService:
     pool = get_pool()

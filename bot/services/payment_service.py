@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from yookassa import Configuration, Payment
+from yookassa import Configuration, Payment, Refund
 
 from config import YooKassaConfig
 from bot.database.pool import get_pool
@@ -72,6 +72,27 @@ class PaymentService:
 
     async def has_successful_payment(self, event_id: int, user_id: int) -> bool:
         return await self._repository.has_successful_payment(event_id, user_id)
+
+    async def get_successful_payment(self, event_id: int, user_id: int):
+        return await self._repository.get_successful_payment(event_id, user_id)
+
+    async def refund_payment(self, payment_id: str, amount: float) -> bool:
+        try:
+            loop = asyncio.get_event_loop()
+            refund_data = {
+                "amount": {"value": f"{amount:.2f}", "currency": "RUB"},
+                "payment_id": payment_id,
+            }
+            refund_idempotency_key = str(uuid4())
+            refund = await loop.run_in_executor(
+                None,
+                lambda: Refund.create(refund_data, refund_idempotency_key),
+            )
+            logger.info(f"Refund created: refund_id={refund.id}, payment_id={payment_id}, amount={amount}")
+            return refund.status == "succeeded"
+        except Exception as e:
+            logger.error(f"Failed to create refund: {e}", exc_info=True)
+            return False
 
     async def handle_webhook(self, payment_id: str) -> Optional[PaymentModel]:
         try:

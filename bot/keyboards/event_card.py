@@ -5,6 +5,7 @@ from bot.utils.callbacks import (
     START_MAIN_MENU,
     event_payment,
     event_payment_method,
+    event_refund,
     event_view,
 )
 from bot.utils.di import get_config
@@ -20,11 +21,13 @@ def event_list_keyboard(events):
     return builder.as_markup()
 
 
-def event_card_keyboard(event_id: int, is_paid: bool = False, is_paid_event: bool = True):
+def event_card_keyboard(event_id: int, is_paid: bool = False, is_paid_event: bool = True, is_registered: bool = False):
     builder = InlineKeyboardBuilder()
     config = get_config()
     if is_paid_event and not is_paid:
         builder.button(text=t("button.event.pay"), callback_data=event_payment(event_id))
+    if is_registered:
+        builder.button(text=t("button.event.refund"), callback_data=event_refund(event_id))
     builder.button(text=t("button.event.ask_question"), url=config.support.question_url)
     builder.button(text=t("button.back"), callback_data=EVENT_BACK_TO_LIST)
     builder.adjust(1)
