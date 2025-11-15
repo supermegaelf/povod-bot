@@ -79,3 +79,13 @@ class RegistrationRepository:
         """
         await self._pool.execute(query, event_id, user_id, status)
 
+    async def is_registered(self, event_id: int, user_id: int) -> bool:
+        query = """
+        SELECT EXISTS(
+            SELECT 1 FROM registrations
+            WHERE event_id = $1 AND user_id = $2 AND status = $3
+        )
+        """
+        result = await self._pool.fetchval(query, event_id, user_id, STATUS_GOING)
+        return bool(result)
+

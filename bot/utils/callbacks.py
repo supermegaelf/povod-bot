@@ -24,9 +24,8 @@ EDIT_EVENT_FIELD_PREFIX = "edit:field:"
 EDIT_EVENT_BACK = "edit:back"
 EDIT_EVENT_SAVE = "edit:save"
 EDIT_EVENT_CLEAR_IMAGES = "edit:images:clear"
-EDIT_EVENT_PARTICIPANTS = "edit:event:participants"
 EDIT_EVENT_BROADCAST = "edit:event:broadcast"
-EDIT_EVENT_PARTICIPANT_REMOVE_PREFIX = "edit:event:participant:remove:"
+EVENT_REFUND_PREFIX = "event:refund:"
 EDIT_EVENT_CANCEL_EVENT_PREFIX = "edit:cancel:event:"
 EDIT_EVENT_CONFIRM_CANCEL_PREFIX = "edit:confirm_cancel:"
 
@@ -51,8 +50,8 @@ def edit_event_field(event_id: int, field: str) -> str:
     return f"{EDIT_EVENT_FIELD_PREFIX}{event_id}:{field}"
 
 
-def participant_remove(event_id: int, user_id: int) -> str:
-    return f"{EDIT_EVENT_PARTICIPANT_REMOVE_PREFIX}{event_id}:{user_id}"
+def event_refund(event_id: int) -> str:
+    return f"{EVENT_REFUND_PREFIX}{event_id}"
 
 
 def cancel_event(event_id: int) -> str:

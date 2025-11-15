@@ -12,7 +12,6 @@ from bot.utils.callbacks import (
     EDIT_EVENT_BACK,
     EDIT_EVENT_SAVE,
     EDIT_EVENT_CLEAR_IMAGES,
-    EDIT_EVENT_PARTICIPANTS,
     EDIT_EVENT_BROADCAST,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
@@ -21,7 +20,6 @@ from bot.utils.callbacks import (
     confirm_cancel_event,
     edit_event,
     edit_event_field,
-    participant_remove,
 )
 from bot.utils.i18n import t
 
@@ -87,7 +85,6 @@ def manage_events_keyboard(events):
 def manage_event_actions_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.settings.edit"), callback_data=edit_event_field(event_id, "menu"))
-    builder.button(text=t("button.settings.participants"), callback_data=EDIT_EVENT_PARTICIPANTS)
     builder.button(text=t("button.settings.broadcast"), callback_data=EDIT_EVENT_BROADCAST)
     builder.button(text=t("button.settings.cancel_event"), callback_data=cancel_event(event_id))
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
@@ -156,15 +153,6 @@ def edit_images_keyboard(has_images: bool, dirty: bool):
         builder.button(text=t("button.edit.save"), callback_data=EDIT_EVENT_SAVE)
     elif has_images:
         builder.button(text=t("button.edit.clear"), callback_data=EDIT_EVENT_CLEAR_IMAGES)
-    builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
-    builder.adjust(1)
-    return builder.as_markup()
-
-
-def participants_keyboard(event_id: int, participants: list[tuple[int, str]]):
-    builder = InlineKeyboardBuilder()
-    for user_id, label in participants:
-        builder.button(text=label, callback_data=participant_remove(event_id, user_id))
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
     return builder.as_markup()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Optional, TypeVar
@@ -24,7 +25,6 @@ from bot.keyboards import (
     manage_event_actions_keyboard,
     manage_events_keyboard,
     moderator_settings_keyboard,
-    participants_keyboard,
 )
 from bot.utils.callbacks import (
     CREATE_EVENT_BACK,
@@ -40,9 +40,7 @@ from bot.utils.callbacks import (
     EDIT_EVENT_FIELD_PREFIX,
     EDIT_EVENT_PREFIX,
     EDIT_EVENT_CLEAR_IMAGES,
-    EDIT_EVENT_PARTICIPANTS,
     EDIT_EVENT_BROADCAST,
-    EDIT_EVENT_PARTICIPANT_REMOVE_PREFIX,
     EDIT_EVENT_CANCEL_EVENT_PREFIX,
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
     SETTINGS_CREATE_EVENT,
@@ -670,47 +668,6 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data == EDIT_EVENT_PARTICIPANTS)
-async def open_participants(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    event_id = data.get("edit_event_id")
-    if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
-        await state.clear()
-        return
-    services = get_services()
-    await _ensure_event_context(state, event_id)
-    participants = await services.registrations.list_participants(event_id)
-    await _push_edit_stack(state, "participants")
-    await state.set_state(EditEventState.participants)
-    if callback.message:
-        await safe_delete(callback.message)
-        await _send_participants(callback.message, state, event_id, participants)
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANT_REMOVE_PREFIX))
-async def remove_participant(callback: CallbackQuery, state: FSMContext) -> None:
-    if callback.data is None:
-        await callback.answer()
-        return
-    payload = callback.data.removeprefix(EDIT_EVENT_PARTICIPANT_REMOVE_PREFIX)
-    try:
-        event_id_str, user_id_str = payload.split(":", 1)
-        event_id = int(event_id_str)
-        user_id = int(user_id_str)
-    except ValueError:
-        await callback.answer()
-        return
-    services = get_services()
-    await _ensure_event_context(state, event_id)
-    await services.registrations.remove_participant(event_id, user_id)
-    participants = await services.registrations.list_participants(event_id)
-    if callback.message:
-        await _send_participants(callback.message, state, event_id, participants)
-    await callback.answer(t("moderator.participant_removed"))
-
-
 @router.callback_query(F.data == EDIT_EVENT_BROADCAST)
 async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
@@ -753,13 +710,39 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
         return
     services = get_services()
     telegram_ids = await services.registrations.list_participant_telegram_ids(event_id)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Broadcasting message to {len(telegram_ids)} participants for event {event_id}")
+    
+    if not telegram_ids:
+        await _send_prompt_text(
+            message,
+            state,
+            t("moderator.broadcast_no_participants"),
+            edit_step_keyboard(),
+        )
+        await safe_delete(message)
+        return
+    
     delivered = 0
     for telegram_id in telegram_ids:
         try:
             await message.bot.send_message(telegram_id, text)
             delivered += 1
-        except Exception:
+            logger.info(f"Message delivered to {telegram_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send message to {telegram_id}: {e}")
             continue
+    
+    if delivered == 0:
+        await _send_prompt_text(
+            message,
+            state,
+            t("moderator.broadcast_failed"),
+            edit_step_keyboard(),
+        )
+        await safe_delete(message)
+        return
+    
     success_notice = t("moderator.broadcast_sent", count=delivered)
     await state.update_data(edit_stack=["actions"])
     await state.set_state(EditEventState.selecting_field)
@@ -1231,35 +1214,6 @@ async def _send_admin_success_prompt(message: Message, state: FSMContext, text: 
         text,
         manage_event_actions_keyboard(event_id),
     )
-
-
-async def _send_participants(message: Message, state: FSMContext, event_id: int, participants) -> None:
-    count = len(participants)
-    lines = [t("moderator.participants_title", count=count)]
-    if participants:
-        for index, participant in enumerate(participants, start=1):
-            lines.append(f"{index}. {_participant_display(participant)}")
-    else:
-        lines.append(t("moderator.participants_empty"))
-    buttons = [(participant.user_id, _participant_button_label(participant)) for participant in participants]
-    markup = participants_keyboard(event_id, buttons)
-    await _send_prompt_text(message, state, "\n".join(lines), markup)
-
-
-def _participant_display(participant) -> str:
-    if participant.username:
-        handle = participant.username.strip()
-        return f"@{handle}" if not handle.startswith("@") else handle
-    if participant.telegram_id:
-        return str(participant.telegram_id)
-    return str(participant.user_id)
-
-
-def _participant_button_label(participant) -> str:
-    base = _participant_display(participant)
-    if len(base) > 20:
-        base = f"{base[:17]}..."
-    return t("button.participant.remove", name=base)
 
 
 async def _store_preview_media(state: FSMContext, messages: list[Message]) -> None:

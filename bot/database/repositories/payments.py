@@ -88,6 +88,19 @@ class PaymentRepository:
         result = await self._pool.fetchval(query, event_id, user_id)
         return bool(result)
 
+    async def get_successful_payment(self, event_id: int, user_id: int) -> Optional[Payment]:
+        query = """
+        SELECT id, payment_id, event_id, user_id, amount, status, created_at, paid_at, confirmation_url, payment_message_id
+        FROM payments
+        WHERE event_id = $1 AND user_id = $2 AND status = 'succeeded'
+        ORDER BY paid_at DESC
+        LIMIT 1
+        """
+        record = await self._pool.fetchrow(query, event_id, user_id)
+        if record is None:
+            return None
+        return self._to_payment(record)
+
     def _to_payment(self, record: asyncpg.Record) -> Payment:
         return Payment(
             id=record["id"],

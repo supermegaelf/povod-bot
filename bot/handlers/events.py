@@ -11,6 +11,7 @@ from bot.utils.callbacks import (
     EVENT_BACK_TO_LIST,
     EVENT_PAYMENT_METHOD_PREFIX,
     EVENT_PAYMENT_PREFIX,
+    EVENT_REFUND_PREFIX,
     EVENT_VIEW_PREFIX,
     event_payment,
     extract_event_id,
@@ -40,11 +41,12 @@ async def show_event(callback: CallbackQuery) -> None:
     is_paid = False
     if is_paid_event:
         is_paid = await services.payments.has_successful_payment(event.id, user.id)
+    is_registered = await services.registrations.is_registered(event.id, user.id)
     
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
-    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event)
+    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
     if callback.message:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
@@ -164,6 +166,70 @@ async def process_payment(callback: CallbackQuery) -> None:
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith(EVENT_REFUND_PREFIX))
+async def refund_event(callback: CallbackQuery) -> None:
+    services = get_services()
+    event_id = extract_event_id(callback.data, EVENT_REFUND_PREFIX)
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
+        return
+    
+    tg_user = callback.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+    
+    is_registered = await services.registrations.is_registered(event.id, user.id)
+    if not is_registered:
+        await callback.answer(t("event.refund.not_registered"), show_alert=True)
+        return
+    
+    payment = None
+    is_paid_event = bool(event.cost and event.cost > 0)
+    if is_paid_event:
+        payment = await services.payments.get_successful_payment(event.id, user.id)
+        if payment:
+            refund_success = await services.payments.refund_payment(payment.payment_id, payment.amount)
+            if not refund_success:
+                await callback.answer(t("event.refund.payment_failed"), show_alert=True)
+                return
+    
+    try:
+        await services.registrations.remove_participant(event.id, user.id)
+    except Exception:
+        await callback.answer(t("event.refund.error"), show_alert=True)
+        return
+    
+    if payment:
+        await callback.answer(t("event.refund.success_with_payment"), show_alert=True)
+    else:
+        await callback.answer(t("event.refund.success"), show_alert=True)
+    
+    is_paid = False
+    if is_paid_event:
+        is_paid = await services.payments.has_successful_payment(event.id, user.id)
+    is_registered = False
+    
+    stats = await services.registrations.get_stats(event.id)
+    availability = services.registrations.availability(event.max_participants, stats.going)
+    text = format_event_card(event, availability)
+    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
+    
+    if callback.message:
+        await _cleanup_media_group(callback.message)
+        await safe_delete(callback.message)
+        images = list(event.image_file_ids)
+        if images:
+            if len(images) == 1:
+                await callback.message.answer_photo(images[0], caption=text, reply_markup=markup)
+            else:
+                media = [InputMediaPhoto(media=file_id) for file_id in images]
+                media_messages = await callback.message.answer_media_group(media)
+                text_message = await callback.message.answer(text, reply_markup=markup)
+                _remember_media_group(text_message, media_messages)
+        else:
+            await callback.message.answer(text, reply_markup=markup)
 
 
 def _remember_media_group(anchor: Message, media_messages: list[Message]) -> None:
