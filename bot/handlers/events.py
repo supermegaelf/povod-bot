@@ -19,7 +19,7 @@ from bot.utils.callbacks import (
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.i18n import t
-from bot.utils.messaging import safe_delete, safe_delete_by_id
+from bot.utils.messaging import safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
 
 router = Router()
 
@@ -47,20 +47,24 @@ async def show_event(callback: CallbackQuery) -> None:
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability)
     markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
+    
     if callback.message:
+        chat_id = callback.message.chat.id
+        bot = callback.message.bot
+        message_id = callback.message.message_id
         await _cleanup_media_group(callback.message)
-        await safe_delete(callback.message)
+        await safe_delete_recent_bot_messages(bot, chat_id, message_id, count=10)
         images = list(event.image_file_ids)
         if images:
             if len(images) == 1:
-                await callback.message.answer_photo(images[0], caption=text, reply_markup=markup)
+                await bot.send_photo(chat_id, images[0], caption=text, reply_markup=markup)
             else:
                 media = [InputMediaPhoto(media=file_id) for file_id in images]
-                media_messages = await callback.message.answer_media_group(media)
-                text_message = await callback.message.answer(text, reply_markup=markup)
+                media_messages = await bot.send_media_group(chat_id, media)
+                text_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 _remember_media_group(text_message, media_messages)
         else:
-            await callback.message.answer(text, reply_markup=markup)
+            await bot.send_message(chat_id, text, reply_markup=markup)
     await callback.answer()
 
 
