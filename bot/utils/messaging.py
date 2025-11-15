@@ -29,8 +29,9 @@ async def safe_delete_by_id(bot: Bot, chat_id: int | None, message_id: int | Non
 
 
 async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_id: int, count: int = 100) -> None:
+    deleted_count = 0
     failed_count = 0
-    max_failed = 5
+    max_failed = 10
     
     for i in range(count):
         message_id = start_message_id - i
@@ -38,9 +39,12 @@ async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_
             break
         try:
             await bot.delete_message(chat_id, message_id)
+            deleted_count += 1
             failed_count = 0
-        except TelegramBadRequest:
-            failed_count += 1
-            if failed_count >= max_failed:
-                break
+        except TelegramBadRequest as e:
+            error_code = getattr(e, 'error_code', None)
+            if error_code == 400:
+                failed_count += 1
+                if failed_count >= max_failed:
+                    break
             continue
