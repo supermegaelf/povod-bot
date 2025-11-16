@@ -279,6 +279,18 @@ async def process_create_date(message: Message, state: FSMContext) -> None:
         )
         await safe_delete(message)
         return
+    
+    today = date.today()
+    if start_date < today:
+        await _send_prompt_text(
+            message,
+            state,
+            t("create.date_past"),
+            create_step_keyboard(back_enabled=True),
+        )
+        await safe_delete(message)
+        return
+    
     await _push_create_history(state, CreateEventState.date)
     await state.update_data(
         event_date=start_date,
@@ -2005,6 +2017,9 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
             start_date, end_date = _parse_date_input(text)
         except ValueError as error:
             raise ValueError(t("edit.date_invalid_error")) from error
+        today = date.today()
+        if start_date < today:
+            raise ValueError(t("edit.date_past_error"))
         return {"date": start_date, "end_date": end_date}
     if field == "time":
         text = (message.text or "").strip()
