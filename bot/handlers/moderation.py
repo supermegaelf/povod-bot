@@ -857,10 +857,15 @@ async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer()
         return
     event_id = int(parts[2])
+    data = await state.get_data()
+    existing_stack = list(data.get("edit_stack", []))
+    if not existing_stack or existing_stack[-1] != "actions":
+        existing_stack = ["actions"]
+    existing_stack.append("promocodes")
     await state.set_state(EditEventState.selecting_field)
     await state.update_data(
         edit_event_id=event_id,
-        edit_stack=["actions"],
+        edit_stack=existing_stack,
     )
     if callback.message:
         await safe_delete(callback.message)
@@ -1166,6 +1171,16 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
                 edit_field_choice_keyboard(event_id),
             )
         await state.update_data(new_image_file_ids=[])
+        await state.set_state(EditEventState.selecting_field)
+    elif current == "promocodes":
+        if callback.message:
+            await safe_delete(callback.message)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("promocode.admin.menu_prompt"),
+                manage_promocode_actions_keyboard(event_id),
+            )
         await state.set_state(EditEventState.selecting_field)
     elif current == "actions":
         if callback.message:
