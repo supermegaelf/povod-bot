@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
+from html import escape
 from typing import Any, Callable, Optional, TypeVar
 
 from aiogram import F, Router
@@ -972,7 +973,8 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         await state.clear()
         return
-    success_notice = t("notify.event_update_notice", field=_field_label(field), title=event.title)
+    value_text = escape((message.text or "").strip())
+    success_notice = t("notify.event_update_notice", field=_field_label(field), title=event.title, value=value_text)
     admin_notice = _admin_success_message(field)
     await _notify_event_update(message, state, event, success_notice, show_to_moderator=False)
     await state.update_data(edit_stack=["actions"], edit_field=None)
