@@ -23,7 +23,7 @@
   "error.event_not_found": "Повод не найден ⛔️\n\nВыберите действие ⬇️",
   "placeholder.community": "<u>Каналы:</u>\n\n<a href=\"{channel_main}\">💫 ПОВОД СОБРАТЬСЯ</a> — планируем шалости и встречаемся.\n\n<a href=\"{channel_reading}\">📚 ПС, ЧИТАЛЬНЯ</a> — делимся книгами и обсуждаем их.\n\n<a href=\"{channel_ride}\">🚴‍♂️ РАЙД НАУ</a> — крутим педали и чинно пьём кофе после выкатов.\n\n<u>Группы:</u>\n\n<a href=\"{chat_social}\">🕺 ПС, А ДАВАЙ</a> — планируем шалости и встречаемся вне выездов.\n\n<a href=\"{chat_discuss}\">💬 ПС, ОБСУДИМ</a> — болтаем обо всём на свете, делимся мыслями и спорим.",
   "notify.event_cancelled": "Мероприятие <b>«{title}»</b> отменено ⚠️",
-  "notify.event_update_notice": "<b>«{field}»</b> повода <b>«{title}»</b> обновлено на «{value}» ⚠️\n\nВыберите действие ⬇️",
+  "notify.event_update_notice": "<b>«{field}»</b> повода <b>«{title}»</b> обновлено на <b>«{value}»</b> ⚠️\n\nВыберите действие ⬇️",
   "notify.reminder_3days": "До повода <b>«{title}»</b> осталось 3 дня 🔥\n\n{details}",
   "notify.reminder_1day": "Повод <b>«{title}»</b> уже завтра 🔥\n\n{details}",
   "notify.new_event": "Добавлен новый повод — <b>«{title}»</b>.\n\nВыберите действие ⬇️",
@@ -148,7 +148,7 @@
   "button.field.description": "Описание",
   "button.field.cost": "Стоимость",
   "button.field.image": "Изображение",
-  "button.field.limit": "Кол-во участников",
+  "button.field.limit": "Количество участников",
   "button.field.reminders": "Напоминания"
 }
 
