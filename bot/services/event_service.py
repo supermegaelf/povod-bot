@@ -8,7 +8,7 @@ class EventService:
     def __init__(self, repository: EventRepository) -> None:
         self._repository = repository
 
-    async def get_active_events(self, limit: int = 5) -> Sequence[Event]:
+    async def get_active_events(self, limit: int | None = None) -> Sequence[Event]:
         return await self._repository.list_active(limit)
 
     async def get_event(self, event_id: int) -> Event | None:
