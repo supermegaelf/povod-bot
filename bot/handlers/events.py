@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
 
 from bot.keyboards import (
@@ -7,11 +8,13 @@ from bot.keyboards import (
     event_list_keyboard,
     payment_method_keyboard,
 )
+from bot.handlers.states import PromocodeState
 from bot.utils.callbacks import (
     EVENT_BACK_TO_LIST,
     EVENT_PAYMENT_METHOD_PREFIX,
     EVENT_PAYMENT_PREFIX,
     EVENT_REFUND_PREFIX,
+    EVENT_PROMOCODE_PREFIX,
     EVENT_VIEW_PREFIX,
     event_payment,
     extract_event_id,
@@ -20,6 +23,7 @@ from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.i18n import t
 from bot.utils.messaging import safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
+from bot.keyboards.event_card import promocode_back_keyboard
 
 router = Router()
 
@@ -146,6 +150,11 @@ async def process_payment(callback: CallbackQuery) -> None:
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username)
 
+    discount = 0.0
+    if event.cost:
+        discount = await services.promocodes.get_user_discount(event.id, user.id)
+    amount = max((event.cost or 0) - discount, 0)
+
     if method != "card":
         await callback.answer(t("payment.method_not_available"), show_alert=True)
         return
@@ -154,7 +163,7 @@ async def process_payment(callback: CallbackQuery) -> None:
         payment_id, confirmation_url = await services.payments.create_payment(
             event_id=event.id,
             user_id=user.id,
-            amount=event.cost,
+            amount=amount,
             description=t("payment.description", title=event.title),
         )
     except Exception:
@@ -165,7 +174,7 @@ async def process_payment(callback: CallbackQuery) -> None:
         await callback.answer(t("payment.create_failed"), show_alert=True)
         return
 
-    text = t("payment.prompt", amount=event.cost, title=event.title)
+    text = t("payment.prompt", amount=amount, title=event.title)
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("button.payment.pay"), url=confirmation_url)],
@@ -181,6 +190,70 @@ async def process_payment(callback: CallbackQuery) -> None:
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
+async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    services = get_services()
+    event_id = extract_event_id(callback.data, EVENT_PROMOCODE_PREFIX)
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
+        return
+
+    tg_user = callback.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+    is_paid_event = bool(event.cost and event.cost > 0)
+    if not is_paid_event:
+        await callback.answer()
+        return
+    has_payment = await services.payments.has_successful_payment(event.id, user.id)
+    if has_payment:
+        await callback.answer()
+        return
+
+    await state.set_state(PromocodeState.code)
+    await state.update_data(promocode_event_id=event.id)
+    if callback.message:
+        await callback.message.answer(
+            t("promocode.prompt"),
+            reply_markup=promocode_back_keyboard(event.id),
+        )
+    await callback.answer()
+
+
+@router.message(PromocodeState.code)
+async def process_promocode(message: Message, state: FSMContext) -> None:
+    services = get_services()
+    data = await state.get_data()
+    event_id = data.get("promocode_event_id")
+    if not event_id:
+        await state.clear()
+        await message.answer(t("error.context_lost_alert"))
+        return
+
+    tg_user = message.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+
+    code = (message.text or "").strip()
+    result = await services.promocodes.apply_promocode(event_id, user.id, code)
+
+    if not result.success:
+        if result.error_code == "expired":
+            text = t("promocode.error.expired")
+        elif result.error_code == "already_used":
+            text = t("promocode.error.already_used")
+        else:
+            text = t("promocode.error.not_found")
+        await message.answer(text, reply_markup=promocode_back_keyboard(event_id))
+        return
+
+    discount_value = result.discount or 0
+    await state.clear()
+    await message.answer(
+        t("promocode.success", discount=f"{discount_value:.0f}"),
+        reply_markup=promocode_back_keyboard(event_id),
+    )
 
 
 @router.callback_query(F.data.startswith(EVENT_REFUND_PREFIX))

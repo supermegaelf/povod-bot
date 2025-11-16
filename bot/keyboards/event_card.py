@@ -6,6 +6,7 @@ from bot.utils.callbacks import (
     START_MAIN_MENU,
     event_payment,
     event_payment_method,
+    event_promocode,
     event_refund,
     event_view,
 )
@@ -27,6 +28,7 @@ def event_card_keyboard(event_id: int, is_paid: bool = False, is_paid_event: boo
     config = get_config()
     if is_paid_event and not is_paid:
         builder.button(text=t("button.event.pay"), callback_data=event_payment(event_id))
+        builder.button(text=t("button.event.promocode"), callback_data=event_promocode(event_id))
     if is_registered:
         builder.button(text=t("button.event.refund"), callback_data=event_refund(event_id))
     builder.button(text=t("button.event.ask_question"), url=config.support.question_url)
@@ -38,6 +40,13 @@ def event_card_keyboard(event_id: int, is_paid: bool = False, is_paid_event: boo
 def payment_method_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.payment.method.card"), callback_data=event_payment_method(event_id, "card"))
+    builder.button(text=t("button.back"), callback_data=event_view(event_id))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def promocode_back_keyboard(event_id: int):
+    builder = InlineKeyboardBuilder()
     builder.button(text=t("button.back"), callback_data=event_view(event_id))
     builder.adjust(1)
     return builder.as_markup()
