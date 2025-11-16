@@ -165,11 +165,11 @@
   "promocode.admin.list_item": "Промокод: <code>{code}</code>\nСкидка: <b>{discount}</b>₽\nДо: <b>{event_start}</b>",
   "promocode.admin.add_code_prompt": "Введите промокод, который нужно добавить ⬇️",
   "promocode.admin.code_empty": "Значение не может быть пустым ⛔️\nПожалуйста, проверьте ввод ⬇️",
-  "promocode.admin.add_discount_prompt": "Введите размер скидки (от <b>0</b>) ⬇️",
+  "promocode.admin.add_discount_prompt": "Введите размер скидки (от <b>0</b>₽ до ♾️) ⬇️",
   "promocode.admin.discount_invalid": "Неверное значение скидки ⛔️\nПожалуйста, проверьте ввод ⬇️",
-  "promocode.admin.add_success": "Промокод <code>{code}</code> со скидкой <b>{discount}</b>₽ добавлен ✅",
+  "promocode.admin.add_success": "Промокод <code>{code}</code> со скидкой <b>{discount}</b>₽ добавлен ✅\n\nВыберите действие ⬇️",
   "promocode.admin.duplicate": "Этот промокод уже существует ⛔️\nПожалуйста, используйте другой ⬇️",
   "promocode.admin.delete_code_prompt": "Введите промокод, который нужно удалить ⬇️",
-  "promocode.admin.delete_success": "Промокод <code>{code}</code> удалён ✅",
+  "promocode.admin.delete_success": "Промокод <code>{code}</code> удалён ✅\n\nВыберите действие ⬇️",
   "promocode.admin.delete_not_found": "Промокод не найден ⛔️\nПожалуйста, проверьте ввод ⬇️"
 }

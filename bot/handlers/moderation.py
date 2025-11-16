@@ -1033,15 +1033,14 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         )
         await safe_delete(message)
         return
+    await _remove_prompt_message(message, state)
+    await safe_delete(message)
     await state.clear()
     normalized_code = code.strip().upper()
-    await _send_prompt_text(
-        message,
-        state,
+    await message.answer(
         t("promocode.admin.add_success", code=normalized_code, discount=f"{value:.0f}"),
-        manage_promocode_actions_keyboard(event_id),
+        reply_markup=manage_promocode_actions_keyboard(event_id),
     )
-    await safe_delete(message)
 
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":delete:"))
