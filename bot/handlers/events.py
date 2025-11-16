@@ -227,6 +227,9 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(PromocodeState.code)
 async def process_promocode(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state != PromocodeState.code.state:
+        return
     services = get_services()
     data = await state.get_data()
     event_id = data.get("promocode_event_id")

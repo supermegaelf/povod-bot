@@ -893,6 +893,15 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
+    data = await state.get_data()
+    existing_stack = list(data.get("edit_stack", []))
+    if not existing_stack or existing_stack[-1] != "promocodes":
+        existing_stack = ["actions", "promocodes"]
+    await state.set_state(EditEventState.selecting_field)
+    await state.update_data(
+        edit_event_id=event_id,
+        edit_stack=existing_stack,
+    )
     promocodes = await services.promocodes.list_promocodes(event_id)
     if callback.message:
         await safe_delete(callback.message)
@@ -939,8 +948,16 @@ async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> Non
         await callback.answer()
         return
     event_id = int(parts[2])
+    data = await state.get_data()
+    existing_stack = list(data.get("edit_stack", []))
+    if not existing_stack or existing_stack[-1] != "promocodes":
+        existing_stack = ["actions", "promocodes"]
     await state.set_state(PromocodeAdminState.code_input)
-    await state.update_data(promocode_event_id=event_id)
+    await state.update_data(
+        promocode_event_id=event_id,
+        edit_event_id=event_id,
+        edit_stack=existing_stack,
+    )
     if callback.message:
         await safe_delete(callback.message)
         await _send_prompt_text(
@@ -954,10 +971,15 @@ async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.message(PromocodeAdminState.code_input)
 async def process_promocode_code_input(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state != PromocodeAdminState.code_input.state:
+        return
+    data = await state.get_data()
+    event_id = data.get("promocode_event_id")
+    if not event_id:
+        return
     code = (message.text or "").strip()
     if not code:
-        data = await state.get_data()
-        event_id = data.get("promocode_event_id")
         await _send_prompt_text(
             message,
             state,
@@ -966,14 +988,21 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
         )
         await safe_delete(message)
         return
-    data = await state.get_data()
     if data.get("promocode_delete_mode"):
         services = get_services()
         event_id = data.get("promocode_event_id")
         deleted = await services.promocodes.delete_promocode(event_id, code)
         await _remove_prompt_message(message, state)
         await safe_delete(message)
+        existing_stack = list(data.get("edit_stack", []))
+        if not existing_stack or existing_stack[-1] != "promocodes":
+            existing_stack = ["actions", "promocodes"]
         await state.clear()
+        await state.set_state(EditEventState.selecting_field)
+        await state.update_data(
+            edit_event_id=event_id,
+            edit_stack=existing_stack,
+        )
         normalized_code = code.strip().upper()
         if deleted:
             await message.answer(
@@ -981,6 +1010,8 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
                 reply_markup=manage_promocode_actions_keyboard(event_id),
             )
         else:
+            await state.set_state(PromocodeAdminState.code_input)
+            await state.update_data(promocode_event_id=event_id, promocode_delete_mode=True)
             await message.answer(
                 t("promocode.admin.delete_not_found"),
                 reply_markup=promocode_input_keyboard(event_id),
@@ -1014,7 +1045,7 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         )
         await safe_delete(message)
         return
-    if value <= 0:
+    if value < 1:
         await _send_prompt_text(
             message,
             state,
@@ -1053,7 +1084,16 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         return
     await _remove_prompt_message(message, state)
     await safe_delete(message)
+    data = await state.get_data()
+    existing_stack = list(data.get("edit_stack", []))
+    if not existing_stack or existing_stack[-1] != "promocodes":
+        existing_stack = ["actions", "promocodes"]
     await state.clear()
+    await state.set_state(EditEventState.selecting_field)
+    await state.update_data(
+        edit_event_id=event_id,
+        edit_stack=existing_stack,
+    )
     normalized_code = code.strip().upper()
     await message.answer(
         t("promocode.admin.add_success", code=normalized_code, discount=f"{value:.0f}"),
@@ -1071,8 +1111,30 @@ async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> 
         await callback.answer()
         return
     event_id = int(parts[2])
+    services = get_services()
+    promocodes = await services.promocodes.list_promocodes(event_id)
+    if not promocodes:
+        if callback.message:
+            await safe_delete(callback.message)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("promocode.admin.list_empty"),
+                manage_promocode_actions_keyboard(event_id),
+            )
+        await callback.answer()
+        return
+    data = await state.get_data()
+    existing_stack = list(data.get("edit_stack", []))
+    if not existing_stack or existing_stack[-1] != "promocodes":
+        existing_stack = ["actions", "promocodes"]
     await state.set_state(PromocodeAdminState.code_input)
-    await state.update_data(promocode_event_id=event_id, promocode_delete_mode=True)
+    await state.update_data(
+        promocode_event_id=event_id,
+        promocode_delete_mode=True,
+        edit_event_id=event_id,
+        edit_stack=existing_stack,
+    )
     if callback.message:
         await safe_delete(callback.message)
         await _send_prompt_text(
@@ -1094,10 +1156,15 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
         await callback.answer()
         return
     event_id = int(parts[2])
+    data = await state.get_data()
+    existing_stack = list(data.get("edit_stack", []))
+    if not existing_stack or existing_stack[-1] != "actions":
+        existing_stack = ["actions"]
+    existing_stack.append("promocodes")
     await state.set_state(EditEventState.selecting_field)
     await state.update_data(
         edit_event_id=event_id,
-        edit_stack=["actions"],
+        edit_stack=existing_stack,
     )
     if callback.message:
         await safe_delete(callback.message)
