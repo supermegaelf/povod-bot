@@ -20,7 +20,7 @@ class PromocodeService:
         self._events = events
 
     async def apply_promocode(self, event_id: int, user_id: int, code: str) -> PromocodeResult:
-        normalized_code = code.strip()
+        normalized_code = code.strip().upper()
         if not normalized_code:
             return PromocodeResult(success=False, error_code="not_found")
 
@@ -53,10 +53,16 @@ class PromocodeService:
         discount_amount: float,
         expires_at: Optional[datetime],
     ) -> None:
-        await self._repository.create(event_id, code, discount_amount, expires_at)
+        normalized_code = code.strip().upper()
+        existing = await self._repository.get_by_code(normalized_code)
+        if existing is not None and existing.event_id == event_id:
+            from bot.utils.i18n import t
+            raise ValueError(t("promocode.admin.duplicate"))
+        await self._repository.create(event_id, normalized_code, discount_amount, expires_at)
 
     async def delete_promocode(self, event_id: int, code: str) -> bool:
-        return await self._repository.delete_by_code(event_id, code)
+        normalized_code = code.strip().upper()
+        return await self._repository.delete_by_code(event_id, normalized_code)
 
     async def list_promocodes(self, event_id: int):
         return await self._repository.list_for_event(event_id)
