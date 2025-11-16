@@ -1022,12 +1022,23 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         return
     services = get_services()
     code = data.get("promocode_code")
-    await services.promocodes.create_promocode(event_id, code, value, None)
+    try:
+        await services.promocodes.create_promocode(event_id, code, value, None)
+    except ValueError as e:
+        await _send_prompt_text(
+            message,
+            state,
+            str(e),
+            promocode_input_keyboard(event_id),
+        )
+        await safe_delete(message)
+        return
     await state.clear()
+    normalized_code = code.strip().upper()
     await _send_prompt_text(
         message,
         state,
-        t("promocode.admin.add_success", code=code, discount=f"{value:.0f}"),
+        t("promocode.admin.add_success", code=normalized_code, discount=f"{value:.0f}"),
         manage_promocode_actions_keyboard(event_id),
     )
     await safe_delete(message)
