@@ -127,6 +127,7 @@
   "button.settings.edit": "Изменить ✏️",
   "button.settings.broadcast": "Сообщение 💬",
   "button.settings.cancel_event": "Отменить 🛑",
+  "button.settings.promocodes": "Промокоды 🎁",
   "button.skip": "Пропустить ➡️",
   "button.event.refund": "Отменить запись ➖",
   "button.hide": "Скрыть ⬆️",
@@ -155,5 +156,18 @@
   "promocode.error.not_found": "Промокод не найден ⛔️\nПожалуйста, проверьте ввод.",
   "promocode.error.expired": "Промокод истек ⛔️\nПожалуйста, используйте другой.",
   "promocode.error.already_used": "Этот промокод уже был активирован ⛔️",
-  "promocode.success": "Скидка {discount} активирована ✅"
+  "promocode.success": "Скидка {discount} активирована ✅",
+  "promocode.admin.list_empty": "Для этого повода ещё нет промокодов.",
+  "promocode.admin.status.new": "новый",
+  "promocode.admin.status.used": "использован",
+  "promocode.admin.list_item": "Код: <code>{code}</code>, скидка: {discount}₽ ({status})",
+  "promocode.admin.list_item_with_expiry": "Код: <code>{code}</code>, скидка: {discount}₽ ({status}), до {expires_at}",
+  "promocode.admin.add_code_prompt": "Введите код промокода ⬇️",
+  "promocode.admin.code_empty": "Код не может быть пустым ⛔️",
+  "promocode.admin.add_discount_prompt": "Введите размер скидки в ₽ ⬇️",
+  "promocode.admin.discount_invalid": "Неверное значение скидки ⛔️",
+  "promocode.admin.add_success": "Промокод <code>{code}</code> со скидкой {discount}₽ добавлен ✅",
+  "promocode.admin.delete_code_prompt": "Введите код промокода, который нужно удалить ⬇️",
+  "promocode.admin.delete_success": "Промокод <code>{code}</code> удалён ✅",
+  "promocode.admin.delete_not_found": "Промокод с таким кодом не найден ⛔️"
 }

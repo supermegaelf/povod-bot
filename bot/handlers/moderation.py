@@ -13,7 +13,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from bot.database.repositories.events import Event
 from bot.database.repositories.registrations import RegistrationStats
-from bot.handlers.states import CreateEventState, EditEventState
+from bot.handlers.states import CreateEventState, EditEventState, PromocodeAdminState
 from bot.keyboards import (
     cancel_event_keyboard,
     create_preview_keyboard,
@@ -25,6 +25,7 @@ from bot.keyboards import (
     edit_step_keyboard,
     manage_event_actions_keyboard,
     manage_events_keyboard,
+    manage_promocode_actions_keyboard,
     moderator_settings_keyboard,
     new_event_notification_keyboard,
 )
@@ -840,6 +841,192 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
             state,
             t("edit.event_options_prompt"),
             manage_event_actions_keyboard(event_id),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("promocode:") & F.data.contains(":list:"))
+async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> None:
+    services = get_services()
+    if callback.data is None:
+        await callback.answer()
+        return
+    payload = callback.data.split(":")
+    if len(payload) != 3:
+        await callback.answer()
+        return
+    event_id = int(payload[2])
+    promocodes = await services.promocodes.list_promocodes(event_id)
+    if callback.message:
+        await safe_delete(callback.message)
+        if not promocodes:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("promocode.admin.list_empty"),
+                manage_promocode_actions_keyboard(event_id),
+            )
+        else:
+            lines = []
+            for p in promocodes:
+                status = t("promocode.admin.status.used") if p.used_at else t("promocode.admin.status.new")
+                if p.expires_at:
+                    lines.append(
+                        t(
+                            "promocode.admin.list_item_with_expiry",
+                            code=p.code,
+                            discount=f"{p.discount_amount:.0f}",
+                            status=status,
+                            expires_at=p.expires_at.strftime("%d.%m.%Y"),
+                        )
+                    )
+                else:
+                    lines.append(
+                        t(
+                            "promocode.admin.list_item",
+                            code=p.code,
+                            discount=f"{p.discount_amount:.0f}",
+                            status=status,
+                        )
+                    )
+            text = "\n".join(lines)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                text,
+                manage_promocode_actions_keyboard(event_id),
+            )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("promocode:") & F.data.contains(":add:"))
+async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer()
+        return
+    event_id = int(parts[2])
+    await state.set_state(PromocodeAdminState.code_input)
+    await state.update_data(promocode_event_id=event_id)
+    if callback.message:
+        await safe_delete(callback.message)
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("promocode.admin.add_code_prompt"),
+            manage_promocode_actions_keyboard(event_id),
+        )
+    await callback.answer()
+
+
+@router.message(PromocodeAdminState.code_input)
+async def process_promocode_code_input(message: Message, state: FSMContext) -> None:
+    code = (message.text or "").strip()
+    if not code:
+        data = await state.get_data()
+        event_id = data.get("promocode_event_id")
+        await _send_prompt_text(
+            message,
+            state,
+            t("promocode.admin.code_empty"),
+            manage_promocode_actions_keyboard(event_id),
+        )
+        await safe_delete(message)
+        return
+    data = await state.get_data()
+    if data.get("promocode_delete_mode"):
+        services = get_services()
+        event_id = data.get("promocode_event_id")
+        deleted = await services.promocodes.delete_promocode(event_id, code)
+        await state.clear()
+        if deleted:
+            await _send_prompt_text(
+                message,
+                state,
+                t("promocode.admin.delete_success", code=code),
+                manage_promocode_actions_keyboard(event_id),
+            )
+        else:
+            await _send_prompt_text(
+                message,
+                state,
+                t("promocode.admin.delete_not_found"),
+                manage_promocode_actions_keyboard(event_id),
+            )
+        await safe_delete(message)
+        return
+    await state.update_data(promocode_code=code)
+    await state.set_state(PromocodeAdminState.discount_input)
+    event_id = data.get("promocode_event_id")
+    await _send_prompt_text(
+        message,
+        state,
+        t("promocode.admin.add_discount_prompt"),
+        manage_promocode_actions_keyboard(event_id),
+    )
+    await safe_delete(message)
+
+
+@router.message(PromocodeAdminState.discount_input)
+async def process_promocode_discount_input(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    data = await state.get_data()
+    event_id = data.get("promocode_event_id")
+    try:
+        value = float(text.replace(",", "."))
+    except ValueError:
+        await _send_prompt_text(
+            message,
+            state,
+            t("promocode.admin.discount_invalid"),
+            manage_promocode_actions_keyboard(event_id),
+        )
+        await safe_delete(message)
+        return
+    if value <= 0:
+        await _send_prompt_text(
+            message,
+            state,
+            t("promocode.admin.discount_invalid"),
+            manage_promocode_actions_keyboard(event_id),
+        )
+        await safe_delete(message)
+        return
+    services = get_services()
+    code = data.get("promocode_code")
+    await services.promocodes.create_promocode(event_id, code, value, None)
+    await state.clear()
+    await _send_prompt_text(
+        message,
+        state,
+        t("promocode.admin.add_success", code=code, discount=f"{value:.0f}"),
+        manage_promocode_actions_keyboard(event_id),
+    )
+    await safe_delete(message)
+
+
+@router.callback_query(F.data.startswith("promocode:") & F.data.contains(":delete:"))
+async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer()
+        return
+    event_id = int(parts[2])
+    await state.set_state(PromocodeAdminState.code_input)
+    await state.update_data(promocode_event_id=event_id, promocode_delete_mode=True)
+    if callback.message:
+        await safe_delete(callback.message)
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("promocode.admin.delete_code_prompt"),
+            manage_promocode_actions_keyboard(event_id),
         )
     await callback.answer()
 

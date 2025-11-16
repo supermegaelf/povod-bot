@@ -26,3 +26,9 @@ class EditEventState(StatesGroup):
 
 class PromocodeState(StatesGroup):
     code = State()
+
+
+class PromocodeAdminState(StatesGroup):
+    action = State()
+    code_input = State()
+    discount_input = State()

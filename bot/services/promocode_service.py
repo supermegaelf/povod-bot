@@ -39,6 +39,21 @@ class PromocodeService:
     async def get_user_discount(self, event_id: int, user_id: int) -> float:
         return await self._repository.get_user_discount(event_id, user_id)
 
+    async def create_promocode(
+        self,
+        event_id: int,
+        code: str,
+        discount_amount: float,
+        expires_at: Optional[datetime],
+    ) -> None:
+        await self._repository.create(event_id, code, discount_amount, expires_at)
+
+    async def delete_promocode(self, event_id: int, code: str) -> bool:
+        return await self._repository.delete_by_code(event_id, code)
+
+    async def list_promocodes(self, event_id: int):
+        return await self._repository.list_for_event(event_id)
+
 
 def build_promocode_service() -> PromocodeService:
     pool = get_pool()
