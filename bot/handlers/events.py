@@ -1,6 +1,7 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
+from datetime import datetime, time
 
 from bot.keyboards import (
     back_to_main_keyboard,
@@ -232,6 +233,19 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
     if not event_id:
         await state.clear()
         await message.answer(t("error.context_lost_alert"))
+        return
+
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await state.clear()
+        await message.answer(t("error.event_not_found"))
+        return
+
+    event_time = event.time or time(0, 0)
+    event_start = datetime.combine(event.date, event_time)
+    if datetime.now() >= event_start:
+        await state.clear()
+        await message.answer(t("promocode.error.expired"), reply_markup=promocode_back_keyboard(event_id))
         return
 
     tg_user = message.from_user

@@ -884,6 +884,10 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
         await callback.answer()
         return
     event_id = int(payload[2])
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
+        return
     promocodes = await services.promocodes.list_promocodes(event_id)
     if callback.message:
         await safe_delete(callback.message)
@@ -895,28 +899,21 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
                 promocode_list_keyboard(event_id),
             )
         else:
+            event_date_str = event.date.strftime("%d.%m.%Y")
+            if event.time:
+                event_start_str = f"{event_date_str} {event.time.strftime('%H:%M')}"
+            else:
+                event_start_str = event_date_str
             lines = []
             for p in promocodes:
-                status = t("promocode.admin.status.used") if p.used_at else t("promocode.admin.status.new")
-                if p.expires_at:
-                    lines.append(
-                        t(
-                            "promocode.admin.list_item_with_expiry",
-                            code=p.code,
-                            discount=f"{p.discount_amount:.0f}",
-                            status=status,
-                            expires_at=p.expires_at.strftime("%d.%m.%Y"),
-                        )
+                lines.append(
+                    t(
+                        "promocode.admin.list_item",
+                        code=p.code,
+                        discount=f"{p.discount_amount:.0f}",
+                        event_start=event_start_str,
                     )
-                else:
-                    lines.append(
-                        t(
-                            "promocode.admin.list_item",
-                            code=p.code,
-                            discount=f"{p.discount_amount:.0f}",
-                            status=status,
-                        )
-                    )
+                )
             text = "\n".join(lines)
             await _send_prompt_text(
                 callback.message,

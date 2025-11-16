@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from typing import Optional
 
 from bot.database.pool import get_pool
 from bot.database.repositories.promocodes import PromocodeRepository
+from bot.services.event_service import EventService
 
 
 @dataclass(frozen=True)
@@ -14,8 +15,9 @@ class PromocodeResult:
 
 
 class PromocodeService:
-    def __init__(self, repository: PromocodeRepository) -> None:
+    def __init__(self, repository: PromocodeRepository, events: EventService) -> None:
         self._repository = repository
+        self._events = events
 
     async def apply_promocode(self, event_id: int, user_id: int, code: str) -> PromocodeResult:
         normalized_code = code.strip()
@@ -26,8 +28,13 @@ class PromocodeService:
         if promocode is None or promocode.event_id != event_id or not promocode.is_active:
             return PromocodeResult(success=False, error_code="not_found")
 
+        event = await self._events.get_event(event_id)
+        if event is None:
+            return PromocodeResult(success=False, error_code="not_found")
+
+        event_start = datetime.combine(event.date, event.time or time.min).replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-        if promocode.expires_at and promocode.expires_at < now.replace(tzinfo=None):
+        if now >= event_start:
             return PromocodeResult(success=False, error_code="expired")
 
         if promocode.used_at is not None:
@@ -55,9 +62,9 @@ class PromocodeService:
         return await self._repository.list_for_event(event_id)
 
 
-def build_promocode_service() -> PromocodeService:
+def build_promocode_service(events: EventService) -> PromocodeService:
     pool = get_pool()
     repository = PromocodeRepository(pool)
-    return PromocodeService(repository)
+    return PromocodeService(repository, events)
 
 
