@@ -165,7 +165,7 @@
   "promocode.admin.list_item": "Промокод: <code>{code}</code>, скидка: <b>{discount}</b>₽, действует до: <b>{event_start}</b>",
   "promocode.admin.add_code_prompt": "Введите промокод, который нужно добавить ⬇️",
   "promocode.admin.code_empty": "Значение не может быть пустым ⛔️\nПожалуйста, проверьте ввод ⬇️",
-  "promocode.admin.add_discount_prompt": "Введите размер скидки (от <b>0</b>₽) ⬇️",
+  "promocode.admin.add_discount_prompt": "Введите размер скидки в рублях (от <b>1</b>) ⬇️",
   "promocode.admin.discount_invalid": "Неверное значение скидки ⛔️\nПожалуйста, проверьте ввод ⬇️",
   "promocode.admin.discount_too_large": "Скидка не может быть больше стоимости мероприятия (<b>{cost}</b>₽) ⛔️\nПожалуйста, проверьте ввод ⬇️",
   "promocode.admin.add_success": "Промокод <code>{code}</code> со скидкой <b>{discount}</b>₽ добавлен ✅\n\nВыберите действие ⬇️",
