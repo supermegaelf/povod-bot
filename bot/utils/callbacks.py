@@ -9,6 +9,7 @@ EVENT_VIEW_PREFIX = "event:view:"
 EVENT_PAYMENT_PREFIX = "event:payment:"
 EVENT_PAYMENT_METHOD_PREFIX = "event:payment:method:"
 EVENT_BACK_TO_LIST = "event:back:list"
+EVENT_PROMOCODE_PREFIX = "event:promocode:"
 
 CREATE_EVENT_BACK = "create:back"
 CREATE_EVENT_CANCEL = "create:cancel"
@@ -41,6 +42,10 @@ def event_payment(event_id: int) -> str:
 
 def event_payment_method(event_id: int, method: str) -> str:
     return f"{EVENT_PAYMENT_METHOD_PREFIX}{event_id}:{method}"
+
+
+def event_promocode(event_id: int) -> str:
+    return f"{EVENT_PROMOCODE_PREFIX}{event_id}"
 
 
 def edit_event(event_id: int) -> str:

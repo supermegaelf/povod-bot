@@ -23,3 +23,6 @@ class EditEventState(StatesGroup):
     image_upload = State()
     broadcast = State()
 
+
+class PromocodeState(StatesGroup):
+    code = State()
