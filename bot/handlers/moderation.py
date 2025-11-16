@@ -27,6 +27,7 @@ from bot.keyboards import (
     manage_events_keyboard,
     manage_promocode_actions_keyboard,
     promocode_input_keyboard,
+    promocode_list_keyboard,
     moderator_settings_keyboard,
     new_event_notification_keyboard,
 )
@@ -846,6 +847,32 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("promocode:menu:"))
+async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer()
+        return
+    event_id = int(parts[2])
+    await state.set_state(EditEventState.selecting_field)
+    await state.update_data(
+        edit_event_id=event_id,
+        edit_stack=["actions"],
+    )
+    if callback.message:
+        await safe_delete(callback.message)
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("promocode.admin.menu_prompt"),
+            manage_promocode_actions_keyboard(event_id),
+        )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":list:"))
 async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
@@ -865,7 +892,7 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
                 callback.message,
                 state,
                 t("promocode.admin.list_empty"),
-                manage_promocode_actions_keyboard(event_id),
+                promocode_list_keyboard(event_id),
             )
         else:
             lines = []
@@ -895,7 +922,7 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
                 callback.message,
                 state,
                 text,
-                manage_promocode_actions_keyboard(event_id),
+                promocode_list_keyboard(event_id),
             )
     await callback.answer()
 
@@ -1042,48 +1069,19 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
         await callback.answer()
         return
     event_id = int(parts[2])
-    services = get_services()
-    promocodes = await services.promocodes.list_promocodes(event_id)
     await state.set_state(EditEventState.selecting_field)
+    await state.update_data(
+        edit_event_id=event_id,
+        edit_stack=["actions"],
+    )
     if callback.message:
         await safe_delete(callback.message)
-        if not promocodes:
-            await _send_prompt_text(
-                callback.message,
-                state,
-                t("promocode.admin.list_empty"),
-                manage_promocode_actions_keyboard(event_id),
-            )
-        else:
-            lines = []
-            for p in promocodes:
-                status = t("promocode.admin.status.used") if p.used_at else t("promocode.admin.status.new")
-                if p.expires_at:
-                    lines.append(
-                        t(
-                            "promocode.admin.list_item_with_expiry",
-                            code=p.code,
-                            discount=f"{p.discount_amount:.0f}",
-                            status=status,
-                            expires_at=p.expires_at.strftime("%d.%m.%Y"),
-                        )
-                    )
-                else:
-                    lines.append(
-                        t(
-                            "promocode.admin.list_item",
-                            code=p.code,
-                            discount=f"{p.discount_amount:.0f}",
-                            status=status,
-                        )
-                    )
-            text = "\n".join(lines)
-            await _send_prompt_text(
-                callback.message,
-                state,
-                text,
-                manage_promocode_actions_keyboard(event_id),
-            )
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("promocode.admin.menu_prompt"),
+            manage_promocode_actions_keyboard(event_id),
+        )
     await callback.answer()
 
 

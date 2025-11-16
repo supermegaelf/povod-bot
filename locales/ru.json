@@ -160,6 +160,7 @@
   "promocode.error.expired": "Промокод истек ⛔️\nПожалуйста, используйте другой.",
   "promocode.error.already_used": "Этот промокод уже был активирован ⛔️",
   "promocode.success": "Скидка {discount} активирована ✅",
+  "promocode.admin.menu_prompt": "Управление промокодами ⬇️",
   "promocode.admin.list_empty": "Для этого повода ещё нет промокодов.",
   "promocode.admin.status.new": "новый",
   "promocode.admin.status.used": "использован",
