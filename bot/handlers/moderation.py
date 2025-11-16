@@ -972,7 +972,7 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         await state.clear()
         return
-    success_notice = t("notify.event_update_notice", field=_field_label(field))
+    success_notice = t("notify.event_update_notice", field=_field_label(field), title=event.title)
     admin_notice = _admin_success_message(field)
     await _notify_event_update(message, state, event, success_notice, show_to_moderator=False)
     await state.update_data(edit_stack=["actions"], edit_field=None)
@@ -1294,10 +1294,14 @@ async def _notify_event_update(message: Message, state: FSMContext, event: Event
     services = get_services()
     bot = message.bot
     telegram_ids = await services.registrations.list_participant_telegram_ids(event.id)
-    broadcast_text = t("notify.event_update_broadcast", details=notice)
+    editor_chat_id = message.chat.id
+    broadcast_text = notice
+    markup = new_event_notification_keyboard(event.id)
     for telegram_id in telegram_ids:
+        if telegram_id == editor_chat_id:
+            continue
         try:
-            await bot.send_message(telegram_id, broadcast_text)
+            await bot.send_message(telegram_id, broadcast_text, reply_markup=markup)
         except Exception:
             continue
 
