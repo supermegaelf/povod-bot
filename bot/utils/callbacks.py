@@ -10,6 +10,8 @@ EVENT_PAYMENT_PREFIX = "event:payment:"
 EVENT_PAYMENT_METHOD_PREFIX = "event:payment:method:"
 EVENT_BACK_TO_LIST = "event:back:list"
 EVENT_PROMOCODE_PREFIX = "event:promocode:"
+EVENT_LIST_PAGE_PREFIX = "event:list:page:"
+MANAGE_EVENTS_PAGE_PREFIX = "manage:events:page:"
 
 CREATE_EVENT_BACK = "create:back"
 CREATE_EVENT_CANCEL = "create:cancel"

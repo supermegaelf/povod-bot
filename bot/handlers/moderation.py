@@ -49,6 +49,7 @@ from bot.utils.callbacks import (
     EDIT_EVENT_CANCEL_EVENT_PREFIX,
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
     HIDE_MESSAGE,
+    MANAGE_EVENTS_PAGE_PREFIX,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     extract_event_id,
@@ -615,6 +616,38 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
             state,
             t("menu.actual_prompt"),
             manage_events_keyboard(events),
+        )
+    await state.update_data(edit_stack=[])
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith(MANAGE_EVENTS_PAGE_PREFIX))
+async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    services = get_services()
+    tg_user = callback.from_user
+    user = await services.users.ensure(tg_user.id, tg_user.username)
+    if not services.users.is_moderator(user):
+        await callback.answer(t("common.no_permissions"), show_alert=True)
+        return
+    page = int(callback.data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
+    events = await services.events.get_active_events(limit=20)
+    if not events:
+        if callback.message:
+            await _remove_prompt_message(callback.message, state)
+            await safe_delete(callback.message)
+            await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
+        await callback.answer()
+        return
+    if callback.message:
+        await safe_delete(callback.message)
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("menu.actual_prompt"),
+            manage_events_keyboard(events, page=page),
         )
     await state.update_data(edit_stack=[])
     await callback.answer()
