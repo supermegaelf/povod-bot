@@ -240,6 +240,10 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
     code = (message.text or "").strip()
     result = await services.promocodes.apply_promocode(event_id, user.id, code)
 
+    bot = message.bot
+    chat_id = message.chat.id
+    await safe_delete_recent_bot_messages(bot, chat_id, message.message_id - 1, count=1)
+
     if not result.success:
         if result.error_code == "expired":
             text = t("promocode.error.expired")
