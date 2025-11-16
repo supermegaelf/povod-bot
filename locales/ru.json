@@ -103,6 +103,7 @@
   "event.card.time_range": "Время проведения: <b>{start} — {end}</b> 🕒",
   "event.card.place": "Место встречи: {place}📍",
   "event.card.cost": "Стоимость: <b>{cost}</b>₽ 💰",
+  "event.card.cost_with_discount": "Стоимость: <b>{cost}</b>₽ (<b>-{discount}</b>₽) 💰",
   "event.card.cost_free": "Стоимость: <b>бесплатно</b> 🆓",
   "event.card.capacity": "Свободных мест: <b>{free}</b> из <b>{capacity}</b> 🎟️",
   "event.card.capacity_unlimited": "Свободных мест: <b>не ограничено</b> ♾️",

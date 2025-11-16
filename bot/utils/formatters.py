@@ -6,7 +6,7 @@ from bot.services.registration_service import Availability
 from bot.utils.i18n import t
 
 
-def format_event_card(event: Event, availability: Availability | None = None) -> str:
+def format_event_card(event: Event, availability: Availability | None = None, discount: float | None = None) -> str:
     lines: list[str] = [t("event.card.header", title=event.title)]
 
     if event.description:
@@ -21,7 +21,12 @@ def format_event_card(event: Event, availability: Availability | None = None) ->
 
     if event.cost is not None:
         if event.cost > 0:
-            detail_lines.append(t("event.card.cost", cost=_format_cost(event.cost)))
+            if discount and discount > 0:
+                detail_lines.append(
+                    t("event.card.cost_with_discount", cost=_format_cost(event.cost), discount=_format_cost(discount))
+                )
+            else:
+                detail_lines.append(t("event.card.cost", cost=_format_cost(event.cost)))
         elif event.cost == 0:
             detail_lines.append(t("event.card.cost_free"))
 
