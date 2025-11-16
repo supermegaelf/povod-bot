@@ -87,7 +87,18 @@ def manage_event_actions_keyboard(event_id: int):
     builder.button(text=t("button.settings.edit"), callback_data=edit_event_field(event_id, "menu"))
     builder.button(text=t("button.settings.broadcast"), callback_data=EDIT_EVENT_BROADCAST)
     builder.button(text=t("button.settings.cancel_event"), callback_data=cancel_event(event_id))
+    builder.button(text=t("button.settings.promocodes"), callback_data=f"promocode:list:{event_id}")
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def manage_promocode_actions_keyboard(event_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=t("button.promocode.add"), callback_data=f"promocode:add:{event_id}")
+    builder.button(text=t("button.promocode.delete"), callback_data=f"promocode:delete:{event_id}")
+    builder.button(text=t("button.promocode.list"), callback_data=f"promocode:list:{event_id}")
+    builder.button(text=t("button.back"), callback_data=edit_event_field(event_id, "menu"))
     builder.adjust(1)
     return builder.as_markup()
 
