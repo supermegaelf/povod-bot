@@ -13,6 +13,7 @@ from bot.utils.callbacks import (
     EDIT_EVENT_SAVE,
     EDIT_EVENT_CLEAR_IMAGES,
     EDIT_EVENT_BROADCAST,
+    MANAGE_EVENTS_PAGE_PREFIX,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     START_MAIN_MENU,
@@ -73,10 +74,31 @@ def create_preview_keyboard():
     return builder.as_markup()
 
 
-def manage_events_keyboard(events):
+def manage_events_keyboard(events, page: int = 0, page_size: int = 5):
     builder = InlineKeyboardBuilder()
-    for event in events:
+    total_events = len(events)
+    total_pages = (total_events + page_size - 1) // page_size if total_events > 0 else 1
+    
+    start_idx = page * page_size
+    end_idx = min(start_idx + page_size, total_events)
+    page_events = events[start_idx:end_idx]
+    
+    for event in page_events:
         builder.button(text=t("button.event.list_item", title=event.title), callback_data=edit_event(event.id))
+    
+    if total_pages > 1:
+        prev_page = max(0, page - 1)
+        next_page = min(total_pages - 1, page + 1)
+        pagination_buttons = []
+        if page > 0:
+            pagination_buttons.append(("⏪", f"{MANAGE_EVENTS_PAGE_PREFIX}{prev_page}"))
+        if page < total_pages - 1:
+            pagination_buttons.append(("⏩", f"{MANAGE_EVENTS_PAGE_PREFIX}{next_page}"))
+        if pagination_buttons:
+            for text, callback_data in pagination_buttons:
+                builder.button(text=text, callback_data=callback_data)
+            builder.adjust(len(pagination_buttons))
+    
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
     return builder.as_markup()

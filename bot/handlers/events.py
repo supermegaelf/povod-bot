@@ -12,6 +12,7 @@ from bot.keyboards import (
 from bot.handlers.states import PromocodeState
 from bot.utils.callbacks import (
     EVENT_BACK_TO_LIST,
+    EVENT_LIST_PAGE_PREFIX,
     EVENT_PAYMENT_METHOD_PREFIX,
     EVENT_PAYMENT_PREFIX,
     EVENT_REFUND_PREFIX,
@@ -108,6 +109,31 @@ async def back_to_list(callback: CallbackQuery) -> None:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
         await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
+async def event_list_page(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    page = int(callback.data.removeprefix(EVENT_LIST_PAGE_PREFIX))
+    services = get_services()
+    events = await services.events.get_active_events()
+    if not events:
+        if callback.message:
+            await _cleanup_media_group(callback.message)
+            await safe_delete(callback.message)
+            await callback.message.answer(
+                t("menu.actual_empty"),
+                reply_markup=back_to_main_keyboard(),
+            )
+        await callback.answer()
+        return
+    if callback.message:
+        await _cleanup_media_group(callback.message)
+        await safe_delete(callback.message)
+        await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events, page=page))
     await callback.answer()
 
 

@@ -22,8 +22,9 @@ def format_event_card(event: Event, availability: Availability | None = None, di
     if event.cost is not None:
         if event.cost > 0:
             if discount and discount > 0:
+                final_cost = max(event.cost - discount, 0)
                 detail_lines.append(
-                    t("event.card.cost_with_discount", cost=_format_cost(event.cost), discount=_format_cost(discount))
+                    t("event.card.cost_with_discount", cost=_format_cost(final_cost), discount=_format_cost(discount))
                 )
             else:
                 detail_lines.append(t("event.card.cost", cost=_format_cost(event.cost)))
