@@ -966,22 +966,20 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
         services = get_services()
         event_id = data.get("promocode_event_id")
         deleted = await services.promocodes.delete_promocode(event_id, code)
+        await _remove_prompt_message(message, state)
+        await safe_delete(message)
         await state.clear()
+        normalized_code = code.strip().upper()
         if deleted:
-            await _send_prompt_text(
-                message,
-                state,
-                t("promocode.admin.delete_success", code=code),
-                manage_promocode_actions_keyboard(event_id),
+            await message.answer(
+                t("promocode.admin.delete_success", code=normalized_code),
+                reply_markup=manage_promocode_actions_keyboard(event_id),
             )
         else:
-            await _send_prompt_text(
-                message,
-                state,
+            await message.answer(
                 t("promocode.admin.delete_not_found"),
-                promocode_input_keyboard(event_id),
+                reply_markup=promocode_input_keyboard(event_id),
             )
-        await safe_delete(message)
         return
     await state.update_data(promocode_code=code)
     await state.set_state(PromocodeAdminState.discount_input)
