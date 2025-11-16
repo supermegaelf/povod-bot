@@ -133,13 +133,15 @@ async def yookassa_webhook_handler(request: Request) -> Response:
                 user = await services.users.get_by_id(payment.user_id)
                 if user and user.telegram_id:
                     from aiogram import Bot
+                    from aiogram.client.default import DefaultBotProperties
+                    from aiogram.enums import ParseMode
                     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
                     from bot.utils.callbacks import event_view
                     from bot.utils.di import get_config
                     from bot.utils.i18n import t
 
                     config = get_config()
-                    bot = Bot(token=config.bot.token, parse_mode="HTML")
+                    bot = Bot(token=config.bot.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
                     event_obj = await services.events.get_event(payment.event_id)
                     if event_obj:
                         if payment.payment_message_id:
