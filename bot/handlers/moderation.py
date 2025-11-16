@@ -1019,6 +1019,21 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         await safe_delete(message)
         return
     services = get_services()
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await state.clear()
+        await message.answer(t("error.event_not_found"))
+        await safe_delete(message)
+        return
+    if event.cost and value > event.cost:
+        await _send_prompt_text(
+            message,
+            state,
+            t("promocode.admin.discount_too_large", cost=f"{event.cost:.0f}"),
+            promocode_input_keyboard(event_id),
+        )
+        await safe_delete(message)
+        return
     code = data.get("promocode_code")
     try:
         await services.promocodes.create_promocode(event_id, code, value, None)
