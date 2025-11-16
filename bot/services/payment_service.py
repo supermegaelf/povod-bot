@@ -89,7 +89,10 @@ class PaymentService:
                 lambda: Refund.create(refund_data, refund_idempotency_key),
             )
             logger.info(f"Refund created: refund_id={refund.id}, payment_id={payment_id}, amount={amount}")
-            return refund.status == "succeeded"
+            if refund.status == "succeeded":
+                await self._repository.update_status(payment_id, "refunded", None)
+                return True
+            return False
         except Exception as e:
             logger.error(f"Failed to create refund: {e}", exc_info=True)
             return False
