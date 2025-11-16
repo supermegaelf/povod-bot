@@ -1426,7 +1426,7 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
     await _update_prompt_message(
         message,
         state,
-        t("edit.image_invalid"),
+        t("edit.image_invalid_error"),
         edit_images_keyboard(len(images) > 0, dirty),
     )
     await safe_delete(message)
@@ -1981,7 +1981,7 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
     if field == "title":
         value = (message.text or "").strip()
         if not value:
-            raise ValueError(t("edit.value_empty_error"))
+            raise ValueError(t("edit.title_empty_error"))
         return {field: value}
     if field == "place":
         value = (message.text or "").strip()
@@ -2043,7 +2043,7 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
         return {"time": start_time, "end_time": end_time}
     if field == "image":
         if not message.photo:
-            raise ValueError(t("edit.image_required_error"))
+            raise ValueError(t("edit.image_invalid_error"))
         return {"image_file_ids": [message.photo[-1].file_id]}
     raise ValueError(t("edit.unknown_field_error"))
 
