@@ -48,9 +48,13 @@ async def show_event(callback: CallbackQuery) -> None:
         is_paid = await services.payments.has_successful_payment(event.id, user.id)
     is_registered = await services.registrations.is_registered(event.id, user.id)
     
+    discount = 0.0
+    if is_paid_event and not is_paid:
+        discount = await services.promocodes.get_user_discount(event.id, user.id)
+    
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, availability)
+    text = format_event_card(event, availability, discount if discount > 0 else None)
     markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
     
     if callback.message:
@@ -322,9 +326,13 @@ async def refund_event(callback: CallbackQuery) -> None:
         is_paid = await services.payments.has_successful_payment(event.id, user.id)
     is_registered = False
     
+    discount = 0.0
+    if is_paid_event and not is_paid:
+        discount = await services.promocodes.get_user_discount(event.id, user.id)
+    
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
-    text = format_event_card(event, availability)
+    text = format_event_card(event, availability, discount if discount > 0 else None)
     markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
     
     if callback.message:
