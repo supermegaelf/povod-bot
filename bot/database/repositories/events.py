@@ -36,7 +36,7 @@ class EventRepository:
                max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
         FROM events
         WHERE status = 'active'
-        ORDER BY date ASC, time ASC
+        ORDER BY created_at DESC
         LIMIT $1
         """
         async with self._pool.acquire() as connection:
