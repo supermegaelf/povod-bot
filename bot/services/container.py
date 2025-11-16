@@ -25,7 +25,7 @@ def build_services(config: Config) -> ServiceContainer:
     registrations = build_registration_service()
     reminders = build_reminder_service(events, registrations, config.reminders)
     payments = build_payment_service(config.yookassa)
-    promocodes = build_promocode_service()
+    promocodes = build_promocode_service(events)
     return ServiceContainer(
         users=users,
         events=events,
