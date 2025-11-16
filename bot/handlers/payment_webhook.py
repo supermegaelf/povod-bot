@@ -137,7 +137,7 @@ async def yookassa_webhook_handler(request: Request) -> Response:
                     from bot.utils.i18n import t
 
                     config = get_config()
-                    bot = Bot(token=config.bot.token)
+                    bot = Bot(token=config.bot.token, parse_mode="HTML")
                     event_obj = await services.events.get_event(payment.event_id)
                     if event_obj:
                         if payment.payment_message_id:
