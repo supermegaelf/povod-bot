@@ -12,6 +12,7 @@ from .settings import (
     manage_event_actions_keyboard,
     manage_events_keyboard,
     manage_promocode_actions_keyboard,
+    promocode_input_keyboard,
     moderator_settings_keyboard,
 )
 
@@ -29,6 +30,7 @@ __all__ = [
     "manage_events_keyboard",
     "manage_event_actions_keyboard",
     "manage_promocode_actions_keyboard",
+    "promocode_input_keyboard",
     "cancel_event_keyboard",
     "edit_field_choice_keyboard",
     "edit_images_keyboard",

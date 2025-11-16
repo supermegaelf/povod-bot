@@ -26,6 +26,7 @@ from bot.keyboards import (
     manage_event_actions_keyboard,
     manage_events_keyboard,
     manage_promocode_actions_keyboard,
+    promocode_input_keyboard,
     moderator_settings_keyboard,
     new_event_notification_keyboard,
 )
@@ -917,7 +918,7 @@ async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> Non
             callback.message,
             state,
             t("promocode.admin.add_code_prompt"),
-            manage_promocode_actions_keyboard(event_id),
+            promocode_input_keyboard(event_id),
         )
     await callback.answer()
 
@@ -932,7 +933,7 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
             message,
             state,
             t("promocode.admin.code_empty"),
-            manage_promocode_actions_keyboard(event_id),
+            promocode_input_keyboard(event_id),
         )
         await safe_delete(message)
         return
@@ -954,7 +955,7 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
                 message,
                 state,
                 t("promocode.admin.delete_not_found"),
-                manage_promocode_actions_keyboard(event_id),
+                promocode_input_keyboard(event_id),
             )
         await safe_delete(message)
         return
@@ -965,7 +966,7 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
         message,
         state,
         t("promocode.admin.add_discount_prompt"),
-        manage_promocode_actions_keyboard(event_id),
+        promocode_input_keyboard(event_id),
     )
     await safe_delete(message)
 
@@ -982,7 +983,7 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
             message,
             state,
             t("promocode.admin.discount_invalid"),
-            manage_promocode_actions_keyboard(event_id),
+            promocode_input_keyboard(event_id),
         )
         await safe_delete(message)
         return
@@ -991,7 +992,7 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
             message,
             state,
             t("promocode.admin.discount_invalid"),
-            manage_promocode_actions_keyboard(event_id),
+            promocode_input_keyboard(event_id),
         )
         await safe_delete(message)
         return
@@ -1026,7 +1027,34 @@ async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> 
             callback.message,
             state,
             t("promocode.admin.delete_code_prompt"),
-            manage_promocode_actions_keyboard(event_id),
+            promocode_input_keyboard(event_id),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("promocode:back:"))
+async def promocode_back(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    parts = callback.data.split(":")
+    if len(parts) != 3:
+        await callback.answer()
+        return
+    event_id = int(parts[2])
+    await state.clear()
+    await state.set_state(EditEventState.selecting_field)
+    await state.update_data(
+        edit_event_id=event_id,
+        edit_stack=["actions"],
+    )
+    if callback.message:
+        await safe_delete(callback.message)
+        await _send_prompt_text(
+            callback.message,
+            state,
+            t("edit.event_options_prompt"),
+            manage_event_actions_keyboard(event_id),
         )
     await callback.answer()
 
