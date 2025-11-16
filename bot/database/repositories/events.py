@@ -30,20 +30,34 @@ class EventRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
-    async def list_active(self, limit: int = 5) -> Sequence[Event]:
-        query = """
-        SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
-               max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
-        FROM events
-        WHERE status = 'active'
-        ORDER BY created_at DESC
-        LIMIT $1
-        """
-        async with self._pool.acquire() as connection:
-            records = await connection.fetch(query, limit)
-            events = [self._to_event(record) for record in records]
-            await self._populate_images(connection, events)
-            return events
+    async def list_active(self, limit: int | None = None) -> Sequence[Event]:
+        if limit is not None:
+            query = """
+            SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
+                   max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
+            FROM events
+            WHERE status = 'active'
+            ORDER BY created_at DESC
+            LIMIT $1
+            """
+            async with self._pool.acquire() as connection:
+                records = await connection.fetch(query, limit)
+                events = [self._to_event(record) for record in records]
+                await self._populate_images(connection, events)
+                return events
+        else:
+            query = """
+            SELECT id, title, date, time, end_date, end_time, place, description, cost, image_file_id,
+                   max_participants, reminder_3days, reminder_1day, reminder_3days_sent_at, reminder_1day_sent_at, status
+            FROM events
+            WHERE status = 'active'
+            ORDER BY created_at DESC
+            """
+            async with self._pool.acquire() as connection:
+                records = await connection.fetch(query)
+                events = [self._to_event(record) for record in records]
+                await self._populate_images(connection, events)
+                return events
 
     async def list_reminder_candidates(self) -> Sequence[Event]:
         query = """
