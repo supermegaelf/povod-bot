@@ -20,18 +20,6 @@ from bot.utils.callbacks import (
     extract_event_id,
     extract_event_id_and_page,
 )
-from bot.utils.di import get_services
-from bot.keyboards import (
-    event_card_keyboard,
-    event_list_keyboard,
-    main_menu_keyboard,
-    manage_event_actions_keyboard,
-    manage_events_keyboard,
-    moderator_settings_keyboard,
-    participants_list_keyboard,
-)
-from bot.utils.i18n import t
-from bot.utils.formatters import format_event_card
 
 
 class MessageRefreshMiddleware(BaseMiddleware):
@@ -81,6 +69,19 @@ class MessageRefreshMiddleware(BaseMiddleware):
         data = callback.data
         if not data:
             return False
+        
+        from bot.utils.di import get_services
+        from bot.keyboards import (
+            event_card_keyboard,
+            event_list_keyboard,
+            main_menu_keyboard,
+            manage_event_actions_keyboard,
+            manage_events_keyboard,
+            moderator_settings_keyboard,
+            participants_list_keyboard,
+        )
+        from bot.utils.i18n import t
+        from bot.utils.formatters import format_event_card
         
         services = get_services()
         
