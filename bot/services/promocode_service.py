@@ -40,8 +40,15 @@ class PromocodeService:
         if await self._repository.is_used_by_user(promocode.id, user_id):
             return PromocodeResult(success=False, error_code="already_used")
 
-        await self._repository.mark_used(promocode.id, user_id, now.replace(tzinfo=None))
-        return PromocodeResult(success=True, discount=promocode.discount_amount)
+        try:
+            await self._repository.mark_used(promocode.id, user_id, now.replace(tzinfo=None))
+            if await self._repository.is_used_by_user(promocode.id, user_id):
+                return PromocodeResult(success=True, discount=promocode.discount_amount)
+            return PromocodeResult(success=False, error_code="already_used")
+        except Exception as e:
+            if await self._repository.is_used_by_user(promocode.id, user_id):
+                return PromocodeResult(success=True, discount=promocode.discount_amount)
+            raise
 
     async def get_user_discount(self, event_id: int, user_id: int) -> float:
         return await self._repository.get_user_discount(event_id, user_id)
