@@ -2027,7 +2027,7 @@ def _format_cost_value(value: float | None) -> str:
     text = format(decimal_value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return f"{text}₽"
+    return text
 
 
 def _format_limit_value(value: int | None) -> str:
