@@ -1,3 +1,5 @@
+import asyncio
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
@@ -41,19 +43,35 @@ async def show_event(callback: CallbackQuery) -> None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
     
+    await callback.answer()
+    
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     is_paid_event = bool(event.cost and event.cost > 0)
+    
+    tasks = [services.registrations.get_stats(event.id)]
+    
+    if is_paid_event:
+        tasks.append(services.payments.has_successful_payment(event.id, user.id))
+    
+    tasks.append(services.registrations.is_registered(event.id, user.id))
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    stats = results[0] if not isinstance(results[0], Exception) else None
+    task_idx = 1
     is_paid = False
     if is_paid_event:
-        is_paid = await services.payments.has_successful_payment(event.id, user.id)
-    is_registered = await services.registrations.is_registered(event.id, user.id)
+        is_paid = results[task_idx] if not isinstance(results[task_idx], Exception) else False
+        task_idx += 1
+    is_registered = results[task_idx] if not isinstance(results[task_idx], Exception) else False
     
     discount = 0.0
     if is_paid_event and not is_paid:
         discount = await services.promocodes.get_user_discount(event.id, user.id)
     
-    stats = await services.registrations.get_stats(event.id)
+    if stats is None:
+        stats = type('Stats', (), {'going': 0})()
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability, discount if discount > 0 else None)
     markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
@@ -86,11 +104,12 @@ async def show_event(callback: CallbackQuery) -> None:
                 _remember_media_group(text_message, media_messages)
         else:
             await bot.send_message(chat_id, text, reply_markup=markup)
-    await callback.answer()
 
 
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
 async def back_to_list(callback: CallbackQuery) -> None:
+    await callback.answer()
+    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -103,19 +122,18 @@ async def back_to_list(callback: CallbackQuery) -> None:
                 t("menu.actual_empty"),
                 reply_markup=back_to_main_keyboard(),
             )
-        await callback.answer()
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
         await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events))
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
 async def event_list_page(callback: CallbackQuery) -> None:
+    await callback.answer()
+    
     if callback.data is None:
-        await callback.answer()
         return
     page = int(callback.data.removeprefix(EVENT_LIST_PAGE_PREFIX))
     services = get_services()
@@ -128,13 +146,11 @@ async def event_list_page(callback: CallbackQuery) -> None:
                 t("menu.actual_empty"),
                 reply_markup=back_to_main_keyboard(),
             )
-        await callback.answer()
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
         await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events, page=page))
-    await callback.answer()
 
 
 @router.callback_query(
@@ -147,6 +163,8 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
+    
+    await callback.answer()
 
     text = t("payment.method_prompt")
     markup = payment_method_keyboard(event_id)
@@ -154,12 +172,10 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
     if callback.message:
         await safe_delete(callback.message)
         await callback.message.answer(text, reply_markup=markup)
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
 async def process_payment(callback: CallbackQuery) -> None:
-    """Создаёт платёж после выбора способа оплаты"""
     if callback.data is None:
         await callback.answer()
         return
@@ -177,6 +193,8 @@ async def process_payment(callback: CallbackQuery) -> None:
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
+    
+    await callback.answer()
 
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -220,7 +238,6 @@ async def process_payment(callback: CallbackQuery) -> None:
         
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
@@ -231,16 +248,16 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
+    
+    await callback.answer()
 
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     is_paid_event = bool(event.cost and event.cost > 0)
     if not is_paid_event:
-        await callback.answer()
         return
     has_payment = await services.payments.has_successful_payment(event.id, user.id)
     if has_payment:
-        await callback.answer()
         return
 
     await state.set_state(PromocodeState.code)
@@ -252,7 +269,6 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
             t("promocode.prompt"),
             reply_markup=promocode_back_keyboard(event.id),
         )
-    await callback.answer()
 
 
 @router.message(PromocodeState.code)
@@ -317,6 +333,8 @@ async def refund_event(callback: CallbackQuery) -> None:
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
+    
+    await callback.answer()
     
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
