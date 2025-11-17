@@ -95,7 +95,7 @@ CREATE_STATE_BY_NAME = {state.state: state for state in CREATE_STATE_SEQUENCE}
 async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
@@ -601,7 +601,7 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
 async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
@@ -633,7 +633,7 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
         return
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
@@ -915,7 +915,18 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
                     participant_name = str(participant.telegram_id)
                 else:
                     participant_name = str(participant.user_id)
-                lines.append(f"{idx}. {participant_name}")
+                
+                full_name_parts = []
+                if participant.first_name:
+                    full_name_parts.append(participant.first_name)
+                if participant.last_name:
+                    full_name_parts.append(participant.last_name)
+                full_name = " ".join(full_name_parts) if full_name_parts else None
+                
+                if full_name:
+                    lines.append(f"{idx}. {participant_name} ({full_name})")
+                else:
+                    lines.append(f"{idx}. {participant_name}")
             text = "\n".join(lines)
             await _send_prompt_text(
                 callback.message,

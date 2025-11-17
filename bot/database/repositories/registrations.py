@@ -17,6 +17,8 @@ class Participant:
     user_id: int
     telegram_id: Optional[int]
     username: Optional[str]
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class RegistrationRepository:
@@ -66,7 +68,7 @@ class RegistrationRepository:
 
     async def list_paid_participants(self, event_id: int) -> list[Participant]:
         query = """
-        SELECT DISTINCT ON (u.id) u.id AS user_id, u.telegram_id, u.username
+        SELECT DISTINCT ON (u.id) u.id AS user_id, u.telegram_id, u.username, u.first_name, u.last_name
         FROM registrations AS r
         JOIN users AS u ON u.id = r.user_id
         JOIN payments AS p ON p.event_id = r.event_id AND p.user_id = r.user_id
@@ -79,6 +81,8 @@ class RegistrationRepository:
                 user_id=row["user_id"],
                 telegram_id=row["telegram_id"],
                 username=row["username"],
+                first_name=row.get("first_name"),
+                last_name=row.get("last_name"),
             )
             for row in rows
         ]

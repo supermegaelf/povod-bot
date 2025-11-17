@@ -19,7 +19,7 @@ async def handle_start(message: Message) -> None:
     tg_user = message.from_user
     if tg_user is None:
         return
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     raw_name = (tg_user.full_name or tg_user.username or "").strip()
     display_name = escape(raw_name) if raw_name else t("start.fallback_name")
     keyboard = main_menu_keyboard(services.users.is_moderator(user))
@@ -44,7 +44,7 @@ async def handle_start(message: Message) -> None:
 async def open_main_menu(callback: CallbackQuery) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     raw_name = (tg_user.full_name or tg_user.username or "").strip()
     display_name = escape(raw_name) if raw_name else t("start.fallback_name")
     keyboard = main_menu_keyboard(services.users.is_moderator(user))

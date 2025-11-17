@@ -10,14 +10,18 @@ class UserService:
         self._repository = repository
         self._admin_ids = set(admin_ids)
 
-    async def ensure(self, telegram_id: int, username: Optional[str]) -> User:
+    async def ensure(self, telegram_id: int, username: Optional[str], first_name: Optional[str] = None, last_name: Optional[str] = None) -> User:
         user = await self._repository.get_by_telegram_id(telegram_id)
         if user is None:
             role = ROLE_ADMIN if telegram_id in self._admin_ids else ROLE_USER
-            return await self._repository.create(telegram_id, username, role=role)
+            return await self._repository.create(telegram_id, username, role=role, first_name=first_name, last_name=last_name)
         if telegram_id in self._admin_ids and user.role != ROLE_ADMIN:
             await self._repository.update_role(user.id, ROLE_ADMIN)
-            return await self._repository.get_by_telegram_id(telegram_id)
+            user = await self._repository.get_by_telegram_id(telegram_id)
+        if first_name is not None or last_name is not None:
+            if user.first_name != first_name or user.last_name != last_name:
+                await self._repository.update_name(user.id, first_name, last_name)
+                user = await self._repository.get_by_telegram_id(telegram_id)
         return user
 
     async def promote_to_moderator(self, user_id: int) -> None:

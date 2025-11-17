@@ -14,7 +14,7 @@ router = Router()
 async def show_actual_events(callback: CallbackQuery) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     events = await services.events.get_active_events()
     if not events:
         if callback.message:
@@ -33,7 +33,7 @@ async def show_actual_events(callback: CallbackQuery) -> None:
 async def show_community(callback: CallbackQuery) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if callback.message:
         await safe_delete(callback.message)
         config = get_config()
@@ -57,7 +57,7 @@ async def show_community(callback: CallbackQuery) -> None:
 async def show_settings(callback: CallbackQuery) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
