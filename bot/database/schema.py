@@ -101,17 +101,37 @@ ALTER TABLE payments
     ADD COLUMN IF NOT EXISTS payment_message_id INTEGER;
 """
 
+ALTER_PROMOCODES_UNIQUE_CONSTRAINT = """
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'promocodes_code_key'
+    ) THEN
+        ALTER TABLE promocodes DROP CONSTRAINT promocodes_code_key;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'promocodes_event_id_code_key'
+    ) THEN
+        ALTER TABLE promocodes ADD CONSTRAINT promocodes_event_id_code_key UNIQUE (event_id, code);
+    END IF;
+END $$;
+"""
+
 CREATE_PROMOCODES = """
 CREATE TABLE IF NOT EXISTS promocodes (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    code VARCHAR(64) NOT NULL UNIQUE,
+    code VARCHAR(64) NOT NULL,
     discount_amount DECIMAL(10, 2) NOT NULL,
     expires_at TIMESTAMP WITHOUT TIME ZONE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     used_by_user_id INTEGER REFERENCES users(id),
     used_at TIMESTAMP WITHOUT TIME ZONE,
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE(event_id, code)
 );
 """
 
@@ -129,5 +149,6 @@ STATEMENTS = (
     CREATE_PAYMENTS,
     ALTER_PAYMENTS_ADD_MESSAGE_ID,
     CREATE_PROMOCODES,
+    ALTER_PROMOCODES_UNIQUE_CONSTRAINT,
 )
 
