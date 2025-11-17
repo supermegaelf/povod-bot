@@ -81,3 +81,9 @@ def new_event_notification_keyboard(event_id: int):
     builder.adjust(1)
     return builder.as_markup()
 
+
+def hide_message_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text=t("button.hide"), callback_data=HIDE_MESSAGE)
+    builder.adjust(1)
+    return builder.as_markup()

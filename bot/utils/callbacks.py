@@ -14,7 +14,6 @@ EVENT_LIST_PAGE_PREFIX = "event:list:page:"
 MANAGE_EVENTS_PAGE_PREFIX = "manage:events:page:"
 
 CREATE_EVENT_BACK = "create:back"
-CREATE_EVENT_CANCEL = "create:cancel"
 CREATE_EVENT_PUBLISH = "create:publish"
 CREATE_EVENT_REMINDER_TOGGLE_3 = "create:reminder:3"
 CREATE_EVENT_REMINDER_TOGGLE_1 = "create:reminder:1"
