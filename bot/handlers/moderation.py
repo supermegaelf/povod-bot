@@ -27,6 +27,7 @@ from bot.keyboards import (
     manage_event_actions_keyboard,
     manage_events_keyboard,
     manage_promocode_actions_keyboard,
+    participants_list_keyboard,
     promocode_input_keyboard,
     promocode_list_keyboard,
     moderator_settings_keyboard,
@@ -48,12 +49,15 @@ from bot.utils.callbacks import (
     EDIT_EVENT_BROADCAST,
     EDIT_EVENT_CANCEL_EVENT_PREFIX,
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
+    EDIT_EVENT_PARTICIPANTS_PREFIX,
+    EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX,
     HIDE_MESSAGE,
     MANAGE_EVENTS_PAGE_PREFIX,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     extract_event_id,
     extract_event_id_and_field,
+    extract_event_id_and_page,
 )
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
@@ -858,6 +862,69 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX))
+async def show_participants_page(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    event_id, page = extract_event_id_and_page(callback.data, EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX)
+    await _render_participants_list(callback, state, event_id, page=page)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PREFIX))
+async def show_participants(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        await callback.answer()
+        return
+    event_id = extract_event_id(callback.data, EDIT_EVENT_PARTICIPANTS_PREFIX)
+    await _render_participants_list(callback, state, event_id, page=0)
+    await callback.answer()
+
+
+async def _render_participants_list(callback: CallbackQuery, state: FSMContext, event_id: int, page: int = 0) -> None:
+    services = get_services()
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
+        return
+    participants = await services.registrations.list_paid_participants(event_id)
+    if callback.message:
+        await _push_edit_stack(state, "participants")
+        await state.update_data(edit_event_id=event_id, edit_stack=["actions", "participants"])
+        await safe_delete(callback.message)
+        if not participants:
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("moderator.participants_empty"),
+                participants_list_keyboard(event_id, participants_count=0, page=0),
+            )
+        else:
+            page_size = 10
+            total_participants = len(participants)
+            start_idx = page * page_size
+            end_idx = min(start_idx + page_size, total_participants)
+            page_participants = participants[start_idx:end_idx]
+            
+            lines = []
+            for idx, participant in enumerate(page_participants, start=start_idx + 1):
+                if participant.username:
+                    participant_name = f"@{participant.username}"
+                elif participant.telegram_id:
+                    participant_name = str(participant.telegram_id)
+                else:
+                    participant_name = str(participant.user_id)
+                lines.append(f"{idx}. {participant_name}")
+            text = "\n".join(lines)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                text,
+                participants_list_keyboard(event_id, participants_count=total_participants, page=page),
+            )
+
+
 @router.callback_query(F.data.startswith(EDIT_EVENT_PREFIX))
 async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.data is None:
@@ -1289,6 +1356,17 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
                 t("promocode.admin.menu_prompt"),
                 manage_promocode_actions_keyboard(event_id),
             )
+        await state.set_state(EditEventState.selecting_field)
+    elif current == "participants":
+        if callback.message:
+            await safe_delete(callback.message)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                t("edit.event_options_prompt"),
+                manage_event_actions_keyboard(event_id),
+            )
+        await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
     elif current == "actions":
         if callback.message:

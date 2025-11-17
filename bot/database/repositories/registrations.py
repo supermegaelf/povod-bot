@@ -64,6 +64,25 @@ class RegistrationRepository:
             for row in rows
         ]
 
+    async def list_paid_participants(self, event_id: int) -> list[Participant]:
+        query = """
+        SELECT DISTINCT u.id AS user_id, u.telegram_id, u.username
+        FROM registrations AS r
+        JOIN users AS u ON u.id = r.user_id
+        JOIN payments AS p ON p.event_id = r.event_id AND p.user_id = r.user_id
+        WHERE r.event_id = $1 AND r.status = $2 AND p.status = 'succeeded'
+        ORDER BY r.registered_at ASC
+        """
+        rows = await self._pool.fetch(query, event_id, STATUS_GOING)
+        return [
+            Participant(
+                user_id=row["user_id"],
+                telegram_id=row["telegram_id"],
+                username=row["username"],
+            )
+            for row in rows
+        ]
+
     async def remove_participant(self, event_id: int, user_id: int) -> None:
         query = """
         DELETE FROM registrations

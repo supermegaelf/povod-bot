@@ -30,6 +30,8 @@ EDIT_EVENT_BROADCAST = "edit:event:broadcast"
 EVENT_REFUND_PREFIX = "event:refund:"
 EDIT_EVENT_CANCEL_EVENT_PREFIX = "edit:cancel:event:"
 EDIT_EVENT_CONFIRM_CANCEL_PREFIX = "edit:confirm_cancel:"
+EDIT_EVENT_PARTICIPANTS_PREFIX = "edit:participants:"
+EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX = "edit:participants:page:"
 HIDE_MESSAGE = "hide:message"
 
 
@@ -69,6 +71,14 @@ def confirm_cancel_event(event_id: int) -> str:
     return f"{EDIT_EVENT_CONFIRM_CANCEL_PREFIX}{event_id}"
 
 
+def event_participants(event_id: int) -> str:
+    return f"{EDIT_EVENT_PARTICIPANTS_PREFIX}{event_id}"
+
+
+def event_participants_page(event_id: int, page: int) -> str:
+    return f"{EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX}{event_id}:{page}"
+
+
 def extract_event_id(data: str, prefix: str) -> int:
     return int(data.removeprefix(prefix))
 
@@ -77,4 +87,10 @@ def extract_event_id_and_field(data: str, prefix: str) -> tuple[int, str]:
     payload = data.removeprefix(prefix)
     event_id_str, field = payload.split(":", 1)
     return int(event_id_str), field
+
+
+def extract_event_id_and_page(data: str, prefix: str) -> tuple[int, int]:
+    payload = data.removeprefix(prefix)
+    event_id_str, page_str = payload.split(":", 1)
+    return int(event_id_str), int(page_str)
 
