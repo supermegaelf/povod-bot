@@ -42,7 +42,7 @@ async def show_event(callback: CallbackQuery) -> None:
         return
     
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     is_paid_event = bool(event.cost and event.cost > 0)
     is_paid = False
     if is_paid_event:
@@ -93,7 +93,7 @@ async def show_event(callback: CallbackQuery) -> None:
 async def back_to_list(callback: CallbackQuery) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     events = await services.events.get_active_events()
     if not events:
         if callback.message:
@@ -179,7 +179,7 @@ async def process_payment(callback: CallbackQuery) -> None:
         return
 
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
 
     discount = 0.0
     if event.cost:
@@ -233,7 +233,7 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
         return
 
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     is_paid_event = bool(event.cost and event.cost > 0)
     if not is_paid_event:
         await callback.answer()
@@ -282,7 +282,7 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
         return
 
     tg_user = message.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
 
     code = (message.text or "").strip()
     result = await services.promocodes.apply_promocode(event_id, user.id, code)
@@ -319,7 +319,7 @@ async def refund_event(callback: CallbackQuery) -> None:
         return
     
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     
     is_registered = await services.registrations.is_registered(event.id, user.id)
     if not is_registered:
