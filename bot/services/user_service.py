@@ -18,10 +18,26 @@ class UserService:
         if telegram_id in self._admin_ids and user.role != ROLE_ADMIN:
             await self._repository.update_role(user.id, ROLE_ADMIN)
             user = await self._repository.get_by_telegram_id(telegram_id)
-        if first_name is not None or last_name is not None:
-            if user.first_name != first_name or user.last_name != last_name:
-                await self._repository.update_name(user.id, first_name, last_name)
-                user = await self._repository.get_by_telegram_id(telegram_id)
+            if user is None:
+                return user
+        new_first = first_name.strip() if first_name and first_name.strip() else None
+        new_last = last_name.strip() if last_name and last_name.strip() else None
+        current_first = user.first_name.strip() if user.first_name and user.first_name.strip() else None
+        current_last = user.last_name.strip() if user.last_name and user.last_name.strip() else None
+        
+        needs_update = False
+        if new_first is not None and current_first != new_first:
+            needs_update = True
+        if new_last is not None and current_last != new_last:
+            needs_update = True
+        if new_first is None and current_first is not None:
+            needs_update = True
+        if new_last is None and current_last is not None:
+            needs_update = True
+        
+        if needs_update:
+            await self._repository.update_name(user.id, new_first, new_last)
+            user = await self._repository.get_by_telegram_id(telegram_id)
         return user
 
     async def promote_to_moderator(self, user_id: int) -> None:
