@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
@@ -32,10 +33,16 @@ class MessageRefreshMiddleware(BaseMiddleware):
         if not isinstance(event, CallbackQuery) or not event.message:
             return await handler(event, data)
         
-        if not await self._should_refresh(event):
-            return await handler(event, data)
+        should_refresh = await self._should_refresh(event)
         
-        await self._refresh_message(event)
+        if should_refresh:
+            try:
+                await event.answer()
+            except Exception:
+                pass
+            
+            asyncio.create_task(self._refresh_message(event))
+        
         return await handler(event, data)
     
     async def _should_refresh(self, callback: CallbackQuery) -> bool:

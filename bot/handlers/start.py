@@ -42,6 +42,8 @@ async def handle_start(message: Message) -> None:
 
 @router.callback_query(F.data == START_MAIN_MENU)
 async def open_main_menu(callback: CallbackQuery) -> None:
+    await callback.answer()
+    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -51,7 +53,6 @@ async def open_main_menu(callback: CallbackQuery) -> None:
     if callback.message:
         await safe_delete(callback.message)
         await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
-    await callback.answer()
 
 
 
