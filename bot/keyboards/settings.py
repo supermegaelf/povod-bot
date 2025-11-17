@@ -109,10 +109,10 @@ def manage_events_keyboard(events, page: int = 0, page_size: int = 5):
 def manage_event_actions_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.settings.edit"), callback_data=edit_event_field(event_id, "menu"))
-    builder.button(text=t("button.settings.broadcast"), callback_data=EDIT_EVENT_BROADCAST)
     builder.button(text=t("button.settings.cancel_event"), callback_data=cancel_event(event_id))
-    builder.button(text=t("button.settings.promocodes"), callback_data=f"promocode:menu:{event_id}")
+    builder.button(text=t("button.settings.broadcast"), callback_data=EDIT_EVENT_BROADCAST)
     builder.button(text=t("button.settings.participants"), callback_data=event_participants(event_id))
+    builder.button(text=t("button.settings.promocodes"), callback_data=f"promocode:menu:{event_id}")
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
     return builder.as_markup()
