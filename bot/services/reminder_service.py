@@ -6,7 +6,7 @@ from aiogram import Bot
 
 from config import ReminderConfig
 from bot.database.repositories.events import Event
-from bot.keyboards import hide_message_keyboard
+from bot.keyboards.common import hide_message_keyboard
 from bot.services.event_service import EventService
 from bot.services.registration_service import RegistrationService
 from bot.utils.formatters import format_event_card
