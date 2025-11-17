@@ -21,13 +21,13 @@ class PromocodeRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
-    async def get_by_code(self, code: str) -> Optional[Promocode]:
+    async def get_by_code(self, event_id: int, code: str) -> Optional[Promocode]:
         query = """
         SELECT id, event_id, code, discount_amount, expires_at, is_active, used_by_user_id, used_at
         FROM promocodes
-        WHERE code = $1
+        WHERE event_id = $1 AND code = $2
         """
-        record = await self._pool.fetchrow(query, code)
+        record = await self._pool.fetchrow(query, event_id, code)
         if record is None:
             return None
         return self._to_promocode(record)
