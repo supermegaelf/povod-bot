@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html import escape
 from typing import Any, Callable, Optional, TypeVar
 
@@ -682,10 +682,13 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
             await _prompt_edit_reminders(callback.message, state, event_id)
         await callback.answer()
         return
+    services = get_services()
     if field == "image":
-        services = get_services()
         event = await services.events.get_event(event_id)
-        existing_images = list(event.image_file_ids) if event else []
+        if event is None:
+            await callback.answer(t("error.event_not_found"), show_alert=True)
+            return
+        existing_images = list(event.image_file_ids)
         await _push_edit_stack(state, "images")
         await state.set_state(EditEventState.image_upload)
         await state.update_data(edit_field=field, new_image_file_ids=existing_images, images_dirty=False)
@@ -693,6 +696,10 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
             await safe_delete(callback.message)
             await _render_edit_image_prompt(callback.message, state)
         await callback.answer()
+        return
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
         return
     await _push_edit_stack(state, "value")
     await state.set_state(EditEventState.value_input)
@@ -702,7 +709,7 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         await _send_prompt_text(
             callback.message,
             state,
-            _edit_prompt_for(field),
+            _compose_edit_prompt(event, field),
             edit_step_keyboard(),
         )
     await callback.answer()
@@ -1949,6 +1956,84 @@ def _edit_prompt_for(field: str) -> str:
         "limit": t("edit.prompt_limit"),
     }
     return prompts.get(field, t("edit.prompt_value_fallback"))
+
+
+def _compose_edit_prompt(event: Event | None, field: str) -> str:
+    prompt = _edit_prompt_for(field)
+    current = _current_value_text(field, event)
+    if current:
+        return f"{current}\n\n{prompt}"
+    return prompt
+
+
+def _current_value_text(field: str, event: Event | None) -> str | None:
+    if event is None:
+        return None
+    empty = t("edit.current.empty")
+    if field == "title":
+        return t("edit.current.title", value=event.title or empty)
+    if field == "date":
+        return t("edit.current.date", value=_format_date_value(event))
+    if field == "time":
+        value = _format_time_value(event) or empty
+        return t("edit.current.time", value=value)
+    if field == "period":
+        value = _format_period_value(event) or empty
+        return t("edit.current.period", value=value)
+    if field == "place":
+        return t("edit.current.place", value=event.place or empty)
+    if field == "description":
+        return t("edit.current.description", value=event.description or empty)
+    if field == "cost":
+        return t("edit.current.cost", value=_format_cost_value(event.cost))
+    if field == "limit":
+        return t("edit.current.limit", value=_format_limit_value(event.max_participants))
+    return None
+
+
+def _format_date_value(event: Event) -> str:
+    pattern = t("format.display_date")
+    start = event.date.strftime(pattern)
+    if event.end_date and event.end_date != event.date:
+        end = event.end_date.strftime(pattern)
+        return f"{start} — {end}"
+    return start
+
+
+def _format_time_value(event: Event) -> str | None:
+    pattern = t("format.display_time")
+    if event.time:
+        return event.time.strftime(pattern)
+    if event.end_time:
+        return event.end_time.strftime(pattern)
+    return None
+
+
+def _format_period_value(event: Event) -> str | None:
+    if not event.end_time:
+        return None
+    pattern = t("format.display_time")
+    end = event.end_time.strftime(pattern)
+    if event.time:
+        start = event.time.strftime(pattern)
+        return f"{start} — {end}"
+    return end
+
+
+def _format_cost_value(value: float | None) -> str:
+    if value is None or value <= 0:
+        return t("edit.current.free")
+    decimal_value = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    text = format(decimal_value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return f"{text}₽"
+
+
+def _format_limit_value(value: int | None) -> str:
+    if value is None or value <= 0:
+        return t("edit.current.unlimited")
+    return str(value)
 
 
 def _field_label(field: str) -> str:
