@@ -909,13 +909,6 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
             
             lines = []
             for idx, participant in enumerate(page_participants, start=start_idx + 1):
-                if participant.username:
-                    participant_name = f"@{participant.username}"
-                elif participant.telegram_id:
-                    participant_name = str(participant.telegram_id)
-                else:
-                    participant_name = str(participant.user_id)
-                
                 full_name_parts = []
                 if participant.first_name:
                     full_name_parts.append(participant.first_name)
@@ -923,10 +916,17 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
                     full_name_parts.append(participant.last_name)
                 full_name = " ".join(full_name_parts) if full_name_parts else None
                 
-                if full_name:
-                    lines.append(f"{idx}. {participant_name} ({full_name})")
+                if participant.username:
+                    username_part = f"@{participant.username}"
+                elif participant.telegram_id:
+                    username_part = str(participant.telegram_id)
                 else:
-                    lines.append(f"{idx}. {participant_name}")
+                    username_part = str(participant.user_id)
+                
+                if full_name:
+                    lines.append(f"{idx}. {full_name} ({username_part})")
+                else:
+                    lines.append(f"{idx}. {username_part}")
             text = "\n".join(lines)
             await _send_prompt_text(
                 callback.message,
