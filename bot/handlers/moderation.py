@@ -23,6 +23,7 @@ from bot.keyboards import (
     edit_images_keyboard,
     edit_reminders_keyboard,
     edit_step_keyboard,
+    hide_message_keyboard,
     manage_event_actions_keyboard,
     manage_events_keyboard,
     manage_promocode_actions_keyboard,
@@ -33,7 +34,6 @@ from bot.keyboards import (
 )
 from bot.utils.callbacks import (
     CREATE_EVENT_BACK,
-    CREATE_EVENT_CANCEL,
     CREATE_EVENT_IMAGES_CONFIRM,
     CREATE_EVENT_PUBLISH,
     CREATE_EVENT_REMINDER_DONE,
@@ -130,17 +130,6 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.message:
         await safe_delete(callback.message)
         await _prompt_create_state(callback.message, state, target_state)
-    await callback.answer()
-
-
-@router.callback_query(F.data == CREATE_EVENT_CANCEL)
-async def create_event_cancel(callback: CallbackQuery, state: FSMContext) -> None:
-    if callback.message:
-        await _remove_prompt_message(callback.message, state)
-        await safe_delete(callback.message)
-        await _clear_preview_media(state, callback.message.bot)
-        await callback.message.answer(t("create.cancelled"), reply_markup=moderator_settings_keyboard())
-    await state.clear()
     await callback.answer()
 
 
@@ -1701,9 +1690,10 @@ async def _notify_cancellation(callback: CallbackQuery, event: Event) -> None:
     bot = callback.message.bot if callback.message else callback.bot
     telegram_ids = await services.registrations.list_participant_telegram_ids(event.id)
     cancel_text = t("notify.event_cancelled", title=event.title)
+    markup = hide_message_keyboard()
     for telegram_id in telegram_ids:
         try:
-            await bot.send_message(telegram_id, cancel_text)
+            await bot.send_message(telegram_id, cancel_text, reply_markup=markup)
         except Exception:
             continue
 

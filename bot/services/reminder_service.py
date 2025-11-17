@@ -6,6 +6,7 @@ from aiogram import Bot
 
 from config import ReminderConfig
 from bot.database.repositories.events import Event
+from bot.keyboards import hide_message_keyboard
 from bot.services.event_service import EventService
 from bot.services.registration_service import RegistrationService
 from bot.utils.formatters import format_event_card
@@ -93,9 +94,10 @@ class ReminderService:
         recipients: list[int],
     ) -> None:
         text = t(rule.text_key, title=event.title, details=card)
+        markup = hide_message_keyboard()
         for telegram_id in recipients:
             try:
-                await bot.send_message(telegram_id, text)
+                await bot.send_message(telegram_id, text, reply_markup=markup)
             except Exception:
                 continue
 
