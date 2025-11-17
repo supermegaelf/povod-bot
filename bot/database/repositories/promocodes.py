@@ -34,18 +34,27 @@ class PromocodeRepository:
 
     async def mark_used(self, promocode_id: int, user_id: int, used_at: datetime) -> None:
         query = """
-        UPDATE promocodes
-        SET used_by_user_id = $2, used_at = $3
-        WHERE id = $1
+        INSERT INTO promocode_usages (promocode_id, user_id, used_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (promocode_id, user_id) DO NOTHING
         """
         await self._pool.execute(query, promocode_id, user_id, used_at)
 
+    async def is_used_by_user(self, promocode_id: int, user_id: int) -> bool:
+        query = """
+        SELECT EXISTS(
+            SELECT 1 FROM promocode_usages
+            WHERE promocode_id = $1 AND user_id = $2
+        )
+        """
+        return await self._pool.fetchval(query, promocode_id, user_id)
+
     async def get_user_discount(self, event_id: int, user_id: int) -> float:
         query = """
-        SELECT COALESCE(MAX(discount_amount), 0)
-        FROM promocodes
-        WHERE event_id = $1
-          AND used_by_user_id = $2
+        SELECT COALESCE(MAX(p.discount_amount), 0)
+        FROM promocodes p
+        INNER JOIN promocode_usages pu ON p.id = pu.promocode_id
+        WHERE p.event_id = $1 AND pu.user_id = $2
         """
         value = await self._pool.fetchval(query, event_id, user_id)
         return float(value or 0)

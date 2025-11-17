@@ -37,7 +37,7 @@ class PromocodeService:
         if now >= event_start:
             return PromocodeResult(success=False, error_code="expired")
 
-        if promocode.used_at is not None:
+        if await self._repository.is_used_by_user(promocode.id, user_id):
             return PromocodeResult(success=False, error_code="already_used")
 
         await self._repository.mark_used(promocode.id, user_id, now.replace(tzinfo=None))
