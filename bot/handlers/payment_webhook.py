@@ -115,6 +115,19 @@ async def yookassa_webhook_handler(request: Request) -> Response:
         logger.info(f"Payment {payment_id} status: {payment.status}")
 
         if payment.status == "succeeded":
+            event_obj = await services.events.get_event(payment.event_id)
+            if event_obj:
+                expected_amount = event_obj.cost or 0.0
+                discount = await services.promocodes.get_user_discount(payment.event_id, payment.user_id)
+                expected_amount = max(expected_amount - discount, 0.0)
+                
+                if abs(payment.amount - expected_amount) > 0.01:
+                    logger.error(
+                        f"Payment amount mismatch: expected {expected_amount}, got {payment.amount} "
+                        f"for payment {payment_id}, event {payment.event_id}, user {payment.user_id}"
+                    )
+                    return web.json_response({"status": "error", "message": "amount mismatch"}, status=400)
+            
             participants = await services.registrations.list_participants(payment.event_id)
             is_already_registered = any(p.user_id == payment.user_id for p in participants)
             
