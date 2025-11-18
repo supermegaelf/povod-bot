@@ -1435,6 +1435,21 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     services = get_services()
+    if field == "time" and "time" in updates:
+        current_event = await services.events.get_event(event_id)
+        if current_event and current_event.end_time:
+            new_time = updates["time"]
+            if new_time:
+                if new_time > current_event.end_time:
+                    await _send_prompt_text(
+                        message,
+                        state,
+                        t("edit.time_after_period_error"),
+                        edit_step_keyboard(),
+                    )
+                    await safe_delete(message)
+                    return
+                updates["end_time"] = current_event.end_time
     event = await services.events.update_event(event_id, updates)
     if event is None:
         await _send_prompt_text(
