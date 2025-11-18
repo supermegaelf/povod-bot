@@ -50,10 +50,19 @@ class MessageRefreshMiddleware(BaseMiddleware):
                 logger.error(f"[MIDDLEWARE] CallbackQuery answer ERROR: data={callback_data[:50]}, user_id={user_id}, error={e}")
             
             if event.message:
-                should_refresh = await self._should_refresh(event)
-                if should_refresh:
-                    logger.info(f"[MIDDLEWARE] Message needs refresh, scheduling refresh task")
-                    asyncio.create_task(self._refresh_message(event))
+                message_age = None
+                if event.message.date:
+                    message_date = event.message.date
+                    if message_date.tzinfo is None:
+                        message_date = message_date.replace(tzinfo=timezone.utc)
+                    now = datetime.now(timezone.utc)
+                    message_age = (now - message_date).total_seconds()
+                    if message_age > 48 * 3600:
+                        logger.info(f"[MIDDLEWARE] Old message detected: age={message_age/3600:.1f}h, scheduling refresh")
+                        should_refresh = await self._should_refresh(event)
+                        if should_refresh:
+                            logger.info(f"[MIDDLEWARE] Message needs refresh, scheduling refresh task")
+                            asyncio.create_task(self._refresh_message(event))
         
         start_time = datetime.now()
         try:
