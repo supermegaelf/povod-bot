@@ -32,7 +32,7 @@ class MessageRefreshMiddleware(BaseMiddleware):
     ) -> Any:
         if isinstance(event, CallbackQuery) and event.message:
             try:
-                await event.answer()
+                await event.answer(cache_time=0)
             except Exception:
                 pass
             
