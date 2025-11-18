@@ -103,6 +103,7 @@ async def show_event(callback: CallbackQuery) -> None:
         send_start = datetime.now()
         if images:
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             if cleanup_start > 0:
                 logger.info(f"[show_event] Scheduling bulk delete: count=300")
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
@@ -153,6 +154,7 @@ async def show_event(callback: CallbackQuery) -> None:
             except Exception as e:
                 logger.warning(f"[show_event] Edit failed: {e}, deleting and sending new")
                 await safe_delete(callback.message)
+                await asyncio.sleep(0.1)
                 await bot.send_message(chat_id, text, reply_markup=markup)
             if cleanup_start > 0:
                 logger.info(f"[show_event] Scheduling bulk delete: count=300")
@@ -182,6 +184,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
         if callback.message:
             await _cleanup_media_group(callback.message)
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             await callback.message.answer(
                 t("menu.actual_empty"),
                 reply_markup=back_to_main_keyboard(),
@@ -194,6 +197,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
             await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
         except Exception:
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[back_to_list] COMPLETED: total_elapsed={total_time:.3f}s")
@@ -220,6 +224,7 @@ async def event_list_page(callback: CallbackQuery) -> None:
                 )
             except Exception:
                 await safe_delete(callback.message)
+                await asyncio.sleep(0.1)
                 await callback.message.answer(
                     t("menu.actual_empty"),
                     reply_markup=back_to_main_keyboard(),
@@ -232,6 +237,7 @@ async def event_list_page(callback: CallbackQuery) -> None:
             await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
         except Exception:
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
 
 
@@ -258,6 +264,7 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
             await callback.message.edit_text(text, reply_markup=markup)
         except Exception:
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             await callback.message.answer(text, reply_markup=markup)
 
 
@@ -338,6 +345,7 @@ async def process_payment(callback: CallbackQuery) -> None:
             payment_message = await callback.message.edit_text(text, reply_markup=markup)
         except Exception:
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             payment_message = await callback.message.answer(text, reply_markup=markup)
         
         if payment_message:
@@ -379,6 +387,7 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
             )
         except Exception:
             await safe_delete(callback.message)
+            await asyncio.sleep(0.1)
             await callback.message.answer(
                 t("promocode.prompt"),
                 reply_markup=promocode_back_keyboard(event.id),
