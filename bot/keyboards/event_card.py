@@ -75,6 +75,10 @@ def promocode_back_keyboard(event_id: int):
 
 
 def new_event_notification_keyboard(event_id: int):
+    return event_link_keyboard(event_id)
+
+
+def event_link_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.event.go"), callback_data=event_view(event_id))
     builder.button(text=t("button.hide"), callback_data=HIDE_MESSAGE)
