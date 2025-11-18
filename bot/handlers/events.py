@@ -36,14 +36,13 @@ _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
 
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
 async def show_event(callback: CallbackQuery) -> None:
+    await callback.answer()
+    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_VIEW_PREFIX)
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
         return
-    
-    await callback.answer()
     
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -149,14 +148,13 @@ async def event_list_page(callback: CallbackQuery) -> None:
     F.data.startswith(EVENT_PAYMENT_PREFIX) & ~F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX)
 )
 async def show_payment_methods(callback: CallbackQuery) -> None:
+    await callback.answer()
+    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
         return
-    
-    await callback.answer()
 
     text = t("payment.method_prompt")
     markup = payment_method_keyboard(event_id)
@@ -236,14 +234,13 @@ async def process_payment(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
 async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PROMOCODE_PREFIX)
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
         return
-    
-    await callback.answer()
 
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -321,14 +318,13 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_REFUND_PREFIX))
 async def refund_event(callback: CallbackQuery) -> None:
+    await callback.answer()
+    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_REFUND_PREFIX)
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
         return
-    
-    await callback.answer()
     
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
