@@ -157,7 +157,7 @@
   "moderator.participants_empty": "Участников нет 🥲",
   "moderator.settings_title": "Выберите вариант ⬇️",
   "notify.event_cancelled": "Мероприятие <b>«{title}»</b> отменено ⚠️",
-  "notify.event_update_notice": "⚠️ <b>«{field}»</b> повода <b>«{title}»</b> обновлено на:\n\n<code>«{value}»</code>\n\nВыберите действие ⬇️",
+  "notify.event_update_notice": "⚠️ <b>«{field}»</b> повода <b>«{title}»</b> обновлено на:\n\n<code>{value}</code>\n\nВыберите действие ⬇️",
   "notify.new_event": "Добавлен новый повод — <b>«{title}»</b>.\n\nВыберите действие ⬇️",
   "notify.reminder_1day": "Повод <b>«{title}»</b> уже завтра 🔥\n\n{details}",
   "notify.reminder_3days": "До повода <b>«{title}»</b> осталось 3 дня 🔥\n\n{details}",
