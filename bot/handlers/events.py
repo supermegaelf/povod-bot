@@ -36,8 +36,6 @@ _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
 
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
 async def show_event(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_VIEW_PREFIX)
     event = await services.events.get_event(event_id)
@@ -99,8 +97,6 @@ async def show_event(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
 async def back_to_list(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -122,8 +118,6 @@ async def back_to_list(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
 async def event_list_page(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     if callback.data is None:
         return
     page = int(callback.data.removeprefix(EVENT_LIST_PAGE_PREFIX))
@@ -148,8 +142,6 @@ async def event_list_page(callback: CallbackQuery) -> None:
     F.data.startswith(EVENT_PAYMENT_PREFIX) & ~F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX)
 )
 async def show_payment_methods(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
     event = await services.events.get_event(event_id)
@@ -168,7 +160,6 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
 async def process_payment(callback: CallbackQuery) -> None:
     if callback.data is None:
-        await callback.answer()
         return
 
     payload = callback.data.removeprefix(EVENT_PAYMENT_METHOD_PREFIX)
@@ -176,7 +167,6 @@ async def process_payment(callback: CallbackQuery) -> None:
         event_id_str, method = payload.split(":", 1)
         event_id = int(event_id_str)
     except ValueError:
-        await callback.answer()
         return
 
     services = get_services()
@@ -184,8 +174,6 @@ async def process_payment(callback: CallbackQuery) -> None:
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
-    
-    await callback.answer()
 
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -234,8 +222,6 @@ async def process_payment(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
 async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
-    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PROMOCODE_PREFIX)
     event = await services.events.get_event(event_id)
@@ -318,12 +304,11 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_REFUND_PREFIX))
 async def refund_event(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_REFUND_PREFIX)
     event = await services.events.get_event(event_id)
     if event is None:
+        await callback.answer(t("error.event_not_found"), show_alert=True)
         return
     
     tg_user = callback.from_user
@@ -339,6 +324,7 @@ async def refund_event(callback: CallbackQuery) -> None:
     if is_paid_event:
         payment = await services.payments.get_successful_payment(event.id, user.id)
         if payment:
+            await callback.answer("")
             refund_success = await services.payments.refund_payment(payment.payment_id, payment.amount)
             if not refund_success:
                 await callback.answer(t("event.refund.payment_failed"), show_alert=True)

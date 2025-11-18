@@ -12,8 +12,6 @@ router = Router()
 
 @router.callback_query(F.data == MENU_ACTUAL_EVENTS)
 async def show_actual_events(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -31,8 +29,6 @@ async def show_actual_events(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == MENU_COMMUNITY)
 async def show_community(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -56,8 +52,6 @@ async def show_community(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == MENU_SETTINGS)
 async def show_settings(callback: CallbackQuery) -> None:
-    await callback.answer()
-    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
