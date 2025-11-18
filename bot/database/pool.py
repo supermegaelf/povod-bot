@@ -11,7 +11,15 @@ async def init_pool(dsn: str) -> asyncpg.Pool:
     global _pool
     async with _lock:
         if _pool is None:
-            _pool = await asyncpg.create_pool(dsn)
+            _pool = await asyncpg.create_pool(
+                dsn,
+                min_size=5,
+                max_size=10,
+                command_timeout=5,
+                server_settings={
+                    "application_name": "povod_bot",
+                },
+            )
     return _pool
 
 
