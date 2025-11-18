@@ -57,13 +57,18 @@ async def open_main_menu(callback: CallbackQuery) -> None:
         logger.error(f"[open_main_menu] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
+    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
+    db_time = (datetime.now() - db_start).total_seconds()
+    logger.info(f"[open_main_menu] DB ensure user: elapsed={db_time:.3f}s")
     raw_name = (tg_user.full_name or tg_user.username or "").strip()
     display_name = escape(raw_name) if raw_name else t("start.fallback_name")
     keyboard = main_menu_keyboard(services.users.is_moderator(user))
     if callback.message:
         await safe_delete(callback.message)
         await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
+        total_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[open_main_menu] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 

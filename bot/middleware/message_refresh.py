@@ -36,17 +36,26 @@ class MessageRefreshMiddleware(BaseMiddleware):
         if isinstance(event, CallbackQuery) and event.message:
             callback_data = event.data or "None"
             user_id = event.from_user.id if event.from_user else 0
-            logger.info(f"[MIDDLEWARE] CallbackQuery received: data={callback_data[:50]}, user_id={user_id}")
+            message_id = event.message.message_id if event.message else 0
+            logger.info(f"[MIDDLEWARE] CallbackQuery received: data={callback_data[:50]}, user_id={user_id}, message_id={message_id}")
             should_refresh = await self._should_refresh(event)
             if should_refresh:
+                logger.info(f"[MIDDLEWARE] Message needs refresh, scheduling refresh task")
                 asyncio.create_task(self._refresh_message(event))
         
         start_time = datetime.now()
-        result = await handler(event, data)
-        elapsed = (datetime.now() - start_time).total_seconds()
-        if isinstance(event, CallbackQuery):
-            callback_data = event.data or "None"
-            logger.info(f"[MIDDLEWARE] Handler completed: data={callback_data[:50]}, elapsed={elapsed:.3f}s")
+        try:
+            result = await handler(event, data)
+            elapsed = (datetime.now() - start_time).total_seconds()
+            if isinstance(event, CallbackQuery):
+                callback_data = event.data or "None"
+                logger.info(f"[MIDDLEWARE] Handler completed: data={callback_data[:50]}, elapsed={elapsed:.3f}s")
+        except Exception as e:
+            elapsed = (datetime.now() - start_time).total_seconds()
+            if isinstance(event, CallbackQuery):
+                callback_data = event.data or "None"
+                logger.error(f"[MIDDLEWARE] Handler ERROR: data={callback_data[:50]}, elapsed={elapsed:.3f}s, error={e}")
+            raise
         return result
     
     async def _should_refresh(self, callback: CallbackQuery) -> bool:

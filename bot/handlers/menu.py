@@ -28,8 +28,14 @@ async def show_actual_events(callback: CallbackQuery) -> None:
         logger.error(f"[show_actual_events] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
+    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
+    db_time = (datetime.now() - db_start).total_seconds()
+    logger.info(f"[show_actual_events] DB ensure user: elapsed={db_time:.3f}s")
+    db_start = datetime.now()
     events = await services.events.get_active_events()
+    db_time = (datetime.now() - db_start).total_seconds()
+    logger.info(f"[show_actual_events] DB get_active_events: elapsed={db_time:.3f}s")
     if not events:
         if callback.message:
             await safe_delete(callback.message)
@@ -39,11 +45,21 @@ async def show_actual_events(callback: CallbackQuery) -> None:
         await safe_delete(callback.message)
         keyboard = event_list_keyboard(events)
         await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
+        total_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[show_actual_events] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 @router.callback_query(F.data == MENU_COMMUNITY)
 async def show_community(callback: CallbackQuery) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[show_community] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[show_community] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[show_community] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -67,7 +83,15 @@ async def show_community(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == MENU_SETTINGS)
 async def show_settings(callback: CallbackQuery) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[show_settings] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[show_settings] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[show_settings] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
