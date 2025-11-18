@@ -32,13 +32,19 @@ async def show_actual_events(callback: CallbackQuery) -> None:
     logger.info(f"[show_actual_events] DB get_active_events: elapsed={db_time:.3f}s")
     if not events:
         if callback.message:
-            await safe_delete(callback.message)
-            await callback.message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
+            try:
+                await callback.message.edit_text(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
+            except Exception:
+                await safe_delete(callback.message)
+                await callback.message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
         return
     if callback.message:
-        await safe_delete(callback.message)
         keyboard = event_list_keyboard(events)
-        await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
+        try:
+            await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[show_actual_events] COMPLETED: total_elapsed={total_time:.3f}s")
 
@@ -52,7 +58,6 @@ async def show_community(callback: CallbackQuery) -> None:
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if callback.message:
-        await safe_delete(callback.message)
         config = get_config()
         community_links = config.community
         text = t("placeholder.community").format(
@@ -62,11 +67,19 @@ async def show_community(callback: CallbackQuery) -> None:
             chat_social=community_links.chat_social,
             chat_discuss=community_links.chat_discuss,
         )
-        await callback.message.answer(
-            text,
-            reply_markup=back_to_main_keyboard(),
-            disable_web_page_preview=True,
-        )
+        try:
+            await callback.message.edit_text(
+                text,
+                reply_markup=back_to_main_keyboard(),
+                disable_web_page_preview=True,
+            )
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(
+                text,
+                reply_markup=back_to_main_keyboard(),
+                disable_web_page_preview=True,
+            )
 
 
 @router.callback_query(F.data == MENU_SETTINGS)
@@ -81,6 +94,10 @@ async def show_settings(callback: CallbackQuery) -> None:
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     if callback.message:
-        await safe_delete(callback.message)
-        await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
+        keyboard = moderator_settings_keyboard()
+        try:
+            await callback.message.edit_text(t("moderator.settings_title"), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("moderator.settings_title"), reply_markup=keyboard)
 
