@@ -3,7 +3,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.utils.callbacks import (
     EVENT_BACK_TO_LIST,
     EVENT_LIST_PAGE_PREFIX,
-    HIDE_MESSAGE,
     START_MAIN_MENU,
     event_payment,
     event_payment_method,
@@ -13,6 +12,7 @@ from bot.utils.callbacks import (
 )
 from bot.utils.di import get_config
 from bot.utils.i18n import t
+from .common import event_link_keyboard
 
 
 def event_list_keyboard(events, page: int = 0, page_size: int = 5):
@@ -76,12 +76,4 @@ def promocode_back_keyboard(event_id: int):
 
 def new_event_notification_keyboard(event_id: int):
     return event_link_keyboard(event_id)
-
-
-def event_link_keyboard(event_id: int):
-    builder = InlineKeyboardBuilder()
-    builder.button(text=t("button.event.go"), callback_data=event_view(event_id))
-    builder.button(text=t("button.hide"), callback_data=HIDE_MESSAGE)
-    builder.adjust(1)
-    return builder.as_markup()
 
