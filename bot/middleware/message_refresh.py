@@ -33,15 +33,25 @@ class MessageRefreshMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        if isinstance(event, CallbackQuery) and event.message:
-            callback_data = event.data or "None"
-            user_id = event.from_user.id if event.from_user else 0
-            message_id = event.message.message_id if event.message else 0
-            logger.info(f"[MIDDLEWARE] CallbackQuery received: data={callback_data[:50]}, user_id={user_id}, message_id={message_id}")
-            should_refresh = await self._should_refresh(event)
-            if should_refresh:
-                logger.info(f"[MIDDLEWARE] Message needs refresh, scheduling refresh task")
-                asyncio.create_task(self._refresh_message(event))
+        if isinstance(event, CallbackQuery):
+            answer_start = datetime.now()
+            try:
+                await event.answer(cache_time=0)
+                answer_elapsed = (datetime.now() - answer_start).total_seconds()
+                callback_data = event.data or "None"
+                user_id = event.from_user.id if event.from_user else 0
+                message_id = event.message.message_id if event.message else 0
+                logger.info(f"[MIDDLEWARE] CallbackQuery answered: data={callback_data[:50]}, user_id={user_id}, message_id={message_id}, elapsed={answer_elapsed:.3f}s")
+            except Exception as e:
+                callback_data = event.data or "None"
+                user_id = event.from_user.id if event.from_user else 0
+                logger.error(f"[MIDDLEWARE] CallbackQuery answer ERROR: data={callback_data[:50]}, user_id={user_id}, error={e}")
+            
+            if event.message:
+                should_refresh = await self._should_refresh(event)
+                if should_refresh:
+                    logger.info(f"[MIDDLEWARE] Message needs refresh, scheduling refresh task")
+                    asyncio.create_task(self._refresh_message(event))
         
         start_time = datetime.now()
         try:
