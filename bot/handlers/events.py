@@ -107,18 +107,36 @@ async def show_event(callback: CallbackQuery) -> None:
         send_start = datetime.now()
         if images:
             if len(images) == 1:
-                await bot.send_photo(chat_id, images[0], caption=text, reply_markup=markup)
+                try:
+                    await asyncio.wait_for(
+                        bot.send_photo(chat_id, images[0], caption=text, reply_markup=markup),
+                        timeout=10.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"[show_event] Single photo send TIMEOUT after 10s")
+                    await bot.send_message(chat_id, text, reply_markup=markup)
+                except Exception as e:
+                    logger.error(f"[show_event] Single photo send ERROR: {e}", exc_info=True)
+                    await bot.send_message(chat_id, text, reply_markup=markup)
             else:
                 text_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 async def _send_media_group_task():
                     try:
                         media = [InputMediaPhoto(media=file_id) for file_id in images]
-                        media_messages = await bot.send_media_group(chat_id, media)
+                        logger.info(f"[show_event] Sending media group: {len(images)} images")
+                        media_start = datetime.now()
+                        media_messages = await asyncio.wait_for(
+                            bot.send_media_group(chat_id, media),
+                            timeout=30.0
+                        )
+                        media_time = (datetime.now() - media_start).total_seconds()
                         _remember_media_group(text_message, media_messages)
                         send_time = (datetime.now() - send_start).total_seconds()
-                        logger.info(f"[show_event] Media group sent: elapsed={send_time:.3f}s")
+                        logger.info(f"[show_event] Media group sent: media_elapsed={media_time:.3f}s, total_elapsed={send_time:.3f}s")
+                    except asyncio.TimeoutError:
+                        logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(images)} images")
                     except Exception as e:
-                        logger.error(f"[show_event] Media group send ERROR: {e}")
+                        logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
                 asyncio.create_task(_send_media_group_task())
         else:
             await bot.send_message(chat_id, text, reply_markup=markup)
