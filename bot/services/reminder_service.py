@@ -17,10 +17,10 @@ class ReminderRule:
     enabled_attr: str
     sent_attr: str
     text_key: str
-    fallback_text_key: str | None = None
     offset_minutes: int | None
     offset_days: int
     send_time: time
+    fallback_text_key: str | None = None
 
 
 class ReminderService:
