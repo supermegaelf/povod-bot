@@ -42,6 +42,11 @@ class MessageRefreshMiddleware(BaseMiddleware):
                 pass
             
             asyncio.create_task(self._refresh_message(event))
+        else:
+            try:
+                await event.answer()
+            except Exception:
+                pass
         
         return await handler(event, data)
     
