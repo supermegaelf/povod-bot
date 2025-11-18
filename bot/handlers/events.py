@@ -40,15 +40,16 @@ _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
 async def show_event(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_event] START: data={callback_data[:50]}, user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[show_event] ANSWERED: elapsed={answer_time:.3f}s")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[show_event] START: data={callback_data[:50]}, user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[show_event] ANSWER ERROR: {e}")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[show_event] START: data={callback_data[:50]}, user_id={user_id}, ANSWER ERROR: {e}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_VIEW_PREFIX)
     db_start = datetime.now()
@@ -130,14 +131,14 @@ async def show_event(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
 async def back_to_list(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[back_to_list] START: user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[back_to_list] ANSWERED: elapsed={answer_time:.3f}s")
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[back_to_list] START: user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[back_to_list] ANSWER ERROR: {e}")
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[back_to_list] START: user_id={user_id}, ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     db_start = datetime.now()
@@ -168,15 +169,16 @@ async def back_to_list(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
 async def event_list_page(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[event_list_page] START: data={callback_data[:50]}, user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[event_list_page] ANSWERED: elapsed={answer_time:.3f}s")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[event_list_page] START: data={callback_data[:50]}, user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[event_list_page] ANSWER ERROR: {e}")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[event_list_page] START: data={callback_data[:50]}, user_id={user_id}, ANSWER ERROR: {e}")
     if callback.data is None:
         return
     page = int(callback.data.removeprefix(EVENT_LIST_PAGE_PREFIX))
@@ -202,15 +204,16 @@ async def event_list_page(callback: CallbackQuery) -> None:
 )
 async def show_payment_methods(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_payment_methods] START: data={callback_data[:50]}, user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[show_payment_methods] ANSWERED: elapsed={answer_time:.3f}s")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[show_payment_methods] START: data={callback_data[:50]}, user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[show_payment_methods] ANSWER ERROR: {e}")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[show_payment_methods] START: data={callback_data[:50]}, user_id={user_id}, ANSWER ERROR: {e}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
     event = await services.events.get_event(event_id)
@@ -229,15 +232,16 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
 async def process_payment(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[process_payment] START: data={callback_data[:50]}, user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[process_payment] ANSWERED: elapsed={answer_time:.3f}s")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[process_payment] START: data={callback_data[:50]}, user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[process_payment] ANSWER ERROR: {e}")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[process_payment] START: data={callback_data[:50]}, user_id={user_id}, ANSWER ERROR: {e}")
     if callback.data is None:
         return
 
@@ -318,15 +322,16 @@ async def process_payment(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
 async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
     start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[start_promocode] START: data={callback_data[:50]}, user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[start_promocode] ANSWERED: elapsed={answer_time:.3f}s")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[start_promocode] START: data={callback_data[:50]}, user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[start_promocode] ANSWER ERROR: {e}")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[start_promocode] START: data={callback_data[:50]}, user_id={user_id}, ANSWER ERROR: {e}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PROMOCODE_PREFIX)
     event = await services.events.get_event(event_id)
@@ -410,15 +415,16 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data.startswith(EVENT_REFUND_PREFIX))
 async def refund_event(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[refund_event] START: data={callback_data[:50]}, user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[refund_event] ANSWERED: elapsed={answer_time:.3f}s")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[refund_event] START: data={callback_data[:50]}, user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[refund_event] ANSWER ERROR: {e}")
+        callback_data = callback.data or "None"
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[refund_event] START: data={callback_data[:50]}, user_id={user_id}, ANSWER ERROR: {e}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_REFUND_PREFIX)
     event = await services.events.get_event(event_id)
