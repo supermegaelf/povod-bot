@@ -93,11 +93,12 @@ CREATE_STATE_BY_NAME = {state.state: state for state in CREATE_STATE_SEQUENCE}
 
 @router.callback_query(F.data == SETTINGS_CREATE_EVENT)
 async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     await state.clear()
     await state.update_data(history=[], image_file_ids=[])
@@ -111,7 +112,6 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
             t("create.title_prompt"),
             create_step_keyboard(back_enabled=True),
         )
-    await callback.answer()
 
 
 @router.callback_query(F.data == CREATE_EVENT_BACK)
@@ -583,6 +583,8 @@ async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_PUBLISH)
 async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    
     services = get_services()
     data = await state.get_data()
     payload = _build_event_payload(data)
@@ -594,16 +596,16 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
         await safe_delete(callback.message)
         await callback.message.answer(t("create.published"), reply_markup=moderator_settings_keyboard())
     await state.clear()
-    await callback.answer()
 
 
 @router.callback_query(F.data == SETTINGS_MANAGE_EVENTS)
 async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     await state.clear()
     events = await services.events.get_active_events(limit=20)
@@ -612,7 +614,6 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
             await _remove_prompt_message(callback.message, state)
             await safe_delete(callback.message)
             await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
-        await callback.answer()
         return
     if callback.message:
         await safe_delete(callback.message)
@@ -623,7 +624,6 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
             manage_events_keyboard(events),
         )
     await state.update_data(edit_stack=[])
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(MANAGE_EVENTS_PAGE_PREFIX))
