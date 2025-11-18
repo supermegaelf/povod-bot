@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Optional, Sequence, Tuple
+import logging
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -212,10 +215,12 @@ class EventRepository:
             images = grouped.get(event.id, [])
             if not images and event.image_file_id:
                 images = [event.image_file_id]
+            logger.info(f"[_populate_images] Event id={event.id}, loaded {len(images)} images")
             event.image_file_ids = tuple(images)
             event.image_file_id = images[0] if images else None
 
     async def _replace_images(self, connection: asyncpg.Connection, event_id: int, images: Sequence[str]) -> None:
+        logger.info(f"[_replace_images] Replacing images for event_id={event_id}, count={len(images)}")
         await connection.execute("DELETE FROM event_images WHERE event_id = $1", event_id)
         if not images:
             return
@@ -224,5 +229,10 @@ class EventRepository:
         VALUES ($1, $2, $3)
         """
         records = [(event_id, file_id, idx) for idx, file_id in enumerate(images)]
-        await connection.executemany(insert_query, records)
+        try:
+            await connection.executemany(insert_query, records)
+            logger.info(f"[_replace_images] Successfully inserted {len(records)} images for event_id={event_id}")
+        except Exception as e:
+            logger.error(f"[_replace_images] ERROR inserting images for event_id={event_id}: {e}", exc_info=True)
+            raise
 
