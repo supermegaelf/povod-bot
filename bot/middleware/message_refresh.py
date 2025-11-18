@@ -6,6 +6,8 @@ from typing import Any, Awaitable, Callable
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, TelegramObject
 
+from bot.utils.i18n import t
+
 logger = logging.getLogger(__name__)
 
 from bot.utils.callbacks import (
@@ -64,7 +66,13 @@ class MessageRefreshMiddleware(BaseMiddleware):
             elapsed = (datetime.now() - start_time).total_seconds()
             if isinstance(event, CallbackQuery):
                 callback_data = event.data or "None"
-                logger.error(f"[MIDDLEWARE] Handler ERROR: data={callback_data[:50]}, elapsed={elapsed:.3f}s, error={e}")
+                error_type = type(e).__name__
+                logger.error(f"[MIDDLEWARE] Handler ERROR: data={callback_data[:50]}, elapsed={elapsed:.3f}s, error={error_type}: {e}", exc_info=True)
+                try:
+                    if event.message and hasattr(event, 'answer'):
+                        await event.answer(t("error.internal_error"), show_alert=True)
+                except Exception:
+                    pass
             raise
         return result
     
