@@ -80,8 +80,11 @@ async def show_event(callback: CallbackQuery) -> None:
         chat_id = callback.message.chat.id
         bot = callback.message.bot
         message_id = callback.message.message_id
+        cleanup_start = message_id - 1
         await _cleanup_media_group(callback.message)
-        await safe_delete_recent_bot_messages(bot, chat_id, message_id, count=300)
+        await safe_delete(callback.message)
+        if cleanup_start > 0:
+            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
         images = list(event.image_file_ids)
         if images:
             if len(images) == 1:
