@@ -162,6 +162,7 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
     markup = payment_method_keyboard(event_id)
 
     if callback.message:
+        await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
         await callback.message.answer(text, reply_markup=markup)
 
@@ -225,6 +226,7 @@ async def process_payment(callback: CallbackQuery) -> None:
 
     payment_message = None
     if callback.message:
+        await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
         payment_message = await callback.message.answer(text, reply_markup=markup)
         
