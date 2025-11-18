@@ -47,14 +47,14 @@ async def handle_start(message: Message) -> None:
 @router.callback_query(F.data == START_MAIN_MENU)
 async def open_main_menu(callback: CallbackQuery) -> None:
     start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[open_main_menu] START: user_id={user_id}")
     try:
         await callback.answer()
         answer_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[open_main_menu] ANSWERED: elapsed={answer_time:.3f}s")
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.info(f"[open_main_menu] START: user_id={user_id}, ANSWERED: elapsed={answer_time:.3f}s")
     except Exception as e:
-        logger.error(f"[open_main_menu] ANSWER ERROR: {e}")
+        user_id = callback.from_user.id if callback.from_user else 0
+        logger.error(f"[open_main_menu] START: user_id={user_id}, ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     db_start = datetime.now()
