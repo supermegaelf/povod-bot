@@ -81,18 +81,7 @@ async def show_event(callback: CallbackQuery) -> None:
         bot = callback.message.bot
         message_id = callback.message.message_id
         await _cleanup_media_group(callback.message)
-        try:
-            await bot.delete_message(chat_id, message_id)
-        except Exception:
-            pass
-        for i in range(1, 51):
-            msg_id = message_id - i
-            if msg_id <= 0:
-                break
-            try:
-                await bot.delete_message(chat_id, msg_id)
-            except Exception:
-                pass
+        await safe_delete_recent_bot_messages(bot, chat_id, message_id, count=300)
         images = list(event.image_file_ids)
         if images:
             if len(images) == 1:
