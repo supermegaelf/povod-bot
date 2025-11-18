@@ -30,23 +30,15 @@ class MessageRefreshMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        if not isinstance(event, CallbackQuery) or not event.message:
-            return await handler(event, data)
-        
-        should_refresh = await self._should_refresh(event)
-        
-        if should_refresh:
+        if isinstance(event, CallbackQuery) and event.message:
             try:
                 await event.answer()
             except Exception:
                 pass
             
-            asyncio.create_task(self._refresh_message(event))
-        else:
-            try:
-                await event.answer()
-            except Exception:
-                pass
+            should_refresh = await self._should_refresh(event)
+            if should_refresh:
+                asyncio.create_task(self._refresh_message(event))
         
         return await handler(event, data)
     

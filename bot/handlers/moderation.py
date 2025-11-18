@@ -116,6 +116,8 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data == CREATE_EVENT_BACK)
 async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    
     data = await state.get_data()
     history = list(data.get("history", []))
     await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
@@ -125,7 +127,6 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
             await _remove_prompt_message(callback.message, state)
             await safe_delete(callback.message)
             await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
-        await callback.answer()
         return
     target_state_name = history.pop()
     await state.update_data(history=history)
@@ -134,14 +135,14 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.message:
         await safe_delete(callback.message)
         await _prompt_create_state(callback.message, state, target_state)
-    await callback.answer()
 
 
 @router.callback_query(F.data == CREATE_EVENT_SKIP)
 async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    
     current_state = await state.get_state()
     if current_state is None:
-        await callback.answer()
         return
     if current_state == CreateEventState.cost.state:
         await _push_create_history(state, CreateEventState.cost)
@@ -211,7 +212,6 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(CreateEventState.reminders)
         if callback.message:
             await _prompt_reminders(callback.message, state)
-    await callback.answer()
 
 
 @router.callback_query(F.data == CREATE_EVENT_IMAGES_CONFIRM)
