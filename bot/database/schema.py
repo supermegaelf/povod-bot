@@ -41,13 +41,31 @@ CREATE TABLE IF NOT EXISTS event_images (
 """
 
 ALTER_EVENTS_PLACE_NULL = """
-ALTER TABLE events
-    ALTER COLUMN place DROP NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'events' 
+        AND column_name = 'place' 
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE events ALTER COLUMN place DROP NOT NULL;
+    END IF;
+END $$;
 """
 
 ALTER_EVENTS_TIME_NULL = """
-ALTER TABLE events
-    ALTER COLUMN time DROP NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'events' 
+        AND column_name = 'time' 
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE events ALTER COLUMN time DROP NOT NULL;
+    END IF;
+END $$;
 """
 
 ALTER_EVENTS_ADD_END_DATE = """
