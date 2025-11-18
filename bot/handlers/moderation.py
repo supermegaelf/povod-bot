@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time
+
+logger = logging.getLogger(__name__)
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html import escape
 from typing import Any, Callable, Optional, TypeVar
@@ -93,7 +95,15 @@ CREATE_STATE_BY_NAME = {state.state: state for state in CREATE_STATE_SEQUENCE}
 
 @router.callback_query(F.data == SETTINGS_CREATE_EVENT)
 async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[start_create_event] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[start_create_event] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[start_create_event] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -597,7 +607,15 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == SETTINGS_MANAGE_EVENTS)
 async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[open_manage_events] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[open_manage_events] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[open_manage_events] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -924,7 +942,16 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PREFIX))
 async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[open_event_actions] START: data={callback_data[:50]}, user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[open_event_actions] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[open_event_actions] ANSWER ERROR: {e}")
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_PREFIX)
@@ -1272,7 +1299,15 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data == EDIT_EVENT_BACK)
 async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[edit_back] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[edit_back] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[edit_back] ANSWER ERROR: {e}")
     data = await state.get_data()
     stack = list(data.get("edit_stack", []))
     if not stack:

@@ -1,9 +1,12 @@
 import asyncio
+import logging
+from datetime import datetime, time
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Message
-from datetime import datetime, time
+
+logger = logging.getLogger(__name__)
 
 from bot.keyboards import (
     back_to_main_keyboard,
@@ -36,7 +39,16 @@ _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
 
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
 async def show_event(callback: CallbackQuery) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[show_event] START: data={callback_data[:50]}, user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[show_event] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[show_event] ANSWER ERROR: {e}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_VIEW_PREFIX)
     event = await services.events.get_event(event_id)
@@ -98,7 +110,15 @@ async def show_event(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
 async def back_to_list(callback: CallbackQuery) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[back_to_list] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[back_to_list] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[back_to_list] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -145,7 +165,16 @@ async def event_list_page(callback: CallbackQuery) -> None:
     F.data.startswith(EVENT_PAYMENT_PREFIX) & ~F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX)
 )
 async def show_payment_methods(callback: CallbackQuery) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[show_payment_methods] START: data={callback_data[:50]}, user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[show_payment_methods] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[show_payment_methods] ANSWER ERROR: {e}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
     event = await services.events.get_event(event_id)
