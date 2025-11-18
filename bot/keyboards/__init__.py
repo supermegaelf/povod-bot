@@ -1,11 +1,5 @@
-from .common import hide_message_keyboard
-from .event_card import (
-    event_card_keyboard,
-    event_link_keyboard,
-    event_list_keyboard,
-    new_event_notification_keyboard,
-    payment_method_keyboard,
-)
+from .common import event_link_keyboard, hide_message_keyboard
+from .event_card import event_card_keyboard, event_list_keyboard, new_event_notification_keyboard, payment_method_keyboard
 from .main_menu import back_to_main_keyboard, main_menu_keyboard
 from .settings import (
     cancel_event_keyboard,
@@ -29,8 +23,8 @@ __all__ = [
     "event_card_keyboard",
     "event_list_keyboard",
     "hide_message_keyboard",
-    "new_event_notification_keyboard",
     "event_link_keyboard",
+    "new_event_notification_keyboard",
     "payment_method_keyboard",
     "back_to_main_keyboard",
     "main_menu_keyboard",
