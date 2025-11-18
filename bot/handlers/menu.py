@@ -40,11 +40,31 @@ async def show_actual_events(callback: CallbackQuery) -> None:
         return
     if callback.message:
         keyboard = event_list_keyboard(events)
-        try:
-            await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
-        except Exception:
+        message_too_old = False
+        if callback.message.date:
+            from datetime import timezone as tz
+            message_date = callback.message.date
+            if message_date.tzinfo is None:
+                message_date = message_date.replace(tzinfo=tz.utc)
+            now = datetime.now(tz.utc)
+            message_age = (now - message_date).total_seconds()
+            if message_age > 3600:
+                message_too_old = True
+                logger.info(f"[show_actual_events] Message too old: age={message_age/60:.1f}m, sending new")
+        
+        if message_too_old:
             await safe_delete(callback.message)
             await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
+        else:
+            try:
+                edit_start = datetime.now()
+                await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
+                edit_time = (datetime.now() - edit_start).total_seconds()
+                logger.info(f"[show_actual_events] Message edited: elapsed={edit_time:.3f}s")
+            except Exception as e:
+                logger.warning(f"[show_actual_events] Edit failed: {e}, sending new message")
+                await safe_delete(callback.message)
+                await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[show_actual_events] COMPLETED: total_elapsed={total_time:.3f}s")
 
