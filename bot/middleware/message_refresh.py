@@ -31,11 +31,6 @@ class MessageRefreshMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         if isinstance(event, CallbackQuery) and event.message:
-            try:
-                await event.answer(cache_time=0)
-            except Exception:
-                pass
-            
             should_refresh = await self._should_refresh(event)
             if should_refresh:
                 asyncio.create_task(self._refresh_message(event))

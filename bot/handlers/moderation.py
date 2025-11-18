@@ -93,6 +93,7 @@ CREATE_STATE_BY_NAME = {state.state: state for state in CREATE_STATE_SEQUENCE}
 
 @router.callback_query(F.data == SETTINGS_CREATE_EVENT)
 async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -114,6 +115,7 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data == CREATE_EVENT_BACK)
 async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     data = await state.get_data()
     history = list(data.get("history", []))
     await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
@@ -135,6 +137,7 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_SKIP)
 async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     current_state = await state.get_state()
     if current_state is None:
         return
@@ -210,6 +213,7 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_IMAGES_CONFIRM)
 async def create_event_images_confirm(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     current_state = await state.get_state()
     if current_state != CreateEventState.image.state:
         return
@@ -552,18 +556,21 @@ async def process_create_limit(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_REMINDER_TOGGLE_3)
 async def toggle_create_reminder_3(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     await _toggle_reminder(state, key="reminder_3days")
     await _edit_reminder_markup(callback, state)
 
 
 @router.callback_query(F.data == CREATE_EVENT_REMINDER_TOGGLE_1)
 async def toggle_create_reminder_1(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     await _toggle_reminder(state, key="reminder_1day")
     await _edit_reminder_markup(callback, state)
 
 
 @router.callback_query(F.data == CREATE_EVENT_REMINDER_DONE)
 async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     await _push_create_history(state, CreateEventState.reminders)
     await state.set_state(CreateEventState.preview)
     if callback.message:
@@ -574,6 +581,7 @@ async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_PUBLISH)
 async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     services = get_services()
     data = await state.get_data()
     payload = _build_event_payload(data)
@@ -589,6 +597,7 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == SETTINGS_MANAGE_EVENTS)
 async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -615,6 +624,7 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith(MANAGE_EVENTS_PAGE_PREFIX))
 async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     services = get_services()
@@ -644,6 +654,7 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_FIELD_PREFIX))
 async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     event_id, field = extract_event_id_and_field(callback.data, EDIT_EVENT_FIELD_PREFIX)
@@ -700,6 +711,7 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == EDIT_EVENT_BROADCAST)
 async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
@@ -795,12 +807,14 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == HIDE_MESSAGE)
 async def hide_message(callback: CallbackQuery) -> None:
+    await callback.answer()
     if callback.message:
         await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CANCEL_EVENT_PREFIX))
 async def confirm_cancel_request(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_CANCEL_EVENT_PREFIX)
@@ -819,6 +833,7 @@ async def confirm_cancel_request(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CONFIRM_CANCEL_PREFIX))
 async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_CONFIRM_CANCEL_PREFIX)
@@ -837,6 +852,7 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX))
 async def show_participants_page(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     event_id, page = extract_event_id_and_page(callback.data, EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX)
@@ -845,6 +861,7 @@ async def show_participants_page(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PREFIX))
 async def show_participants(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_PARTICIPANTS_PREFIX)
@@ -907,6 +924,7 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PREFIX))
 async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_PREFIX)
@@ -935,6 +953,7 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith("promocode:menu:"))
 async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     parts = callback.data.split(":")
@@ -963,6 +982,7 @@ async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":list:"))
 async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     services = get_services()
     if callback.data is None:
         return
@@ -1020,6 +1040,7 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":add:"))
 async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     parts = callback.data.split(":")
@@ -1180,6 +1201,7 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":delete:"))
 async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     parts = callback.data.split(":")
@@ -1221,6 +1243,7 @@ async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith("promocode:back_menu:"))
 async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     if callback.data is None:
         return
     parts = callback.data.split(":")
@@ -1249,6 +1272,7 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data == EDIT_EVENT_BACK)
 async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     data = await state.get_data()
     stack = list(data.get("edit_stack", []))
     if not stack:
@@ -1481,6 +1505,7 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == EDIT_EVENT_CLEAR_IMAGES)
 async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     current_state = await state.get_state()
     if current_state != EditEventState.image_upload.state:
         return
@@ -1507,6 +1532,7 @@ async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data == EDIT_EVENT_SAVE)
 async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     current_state = await state.get_state()
     data = await state.get_data()
     event_id = data.get("edit_event_id")
