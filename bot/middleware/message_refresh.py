@@ -1,9 +1,12 @@
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, TelegramObject
+
+logger = logging.getLogger(__name__)
 
 from bot.utils.callbacks import (
     EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX,
@@ -31,11 +34,20 @@ class MessageRefreshMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         if isinstance(event, CallbackQuery) and event.message:
+            callback_data = event.data or "None"
+            user_id = event.from_user.id if event.from_user else 0
+            logger.info(f"[MIDDLEWARE] CallbackQuery received: data={callback_data[:50]}, user_id={user_id}")
             should_refresh = await self._should_refresh(event)
             if should_refresh:
                 asyncio.create_task(self._refresh_message(event))
         
-        return await handler(event, data)
+        start_time = datetime.now()
+        result = await handler(event, data)
+        elapsed = (datetime.now() - start_time).total_seconds()
+        if isinstance(event, CallbackQuery):
+            callback_data = event.data or "None"
+            logger.info(f"[MIDDLEWARE] Handler completed: data={callback_data[:50]}, elapsed={elapsed:.3f}s")
+        return result
     
     async def _should_refresh(self, callback: CallbackQuery) -> bool:
         if not callback.message or not callback.data:

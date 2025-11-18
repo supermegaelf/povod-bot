@@ -1,7 +1,12 @@
+import logging
+from datetime import datetime
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from bot.keyboards import back_to_main_keyboard, event_list_keyboard, moderator_settings_keyboard
+
+logger = logging.getLogger(__name__)
 from bot.utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS
 from bot.utils.di import get_config, get_services
 from bot.utils.i18n import t
@@ -12,7 +17,15 @@ router = Router()
 
 @router.callback_query(F.data == MENU_ACTUAL_EVENTS)
 async def show_actual_events(callback: CallbackQuery) -> None:
-    await callback.answer()
+    start_time = datetime.now()
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[show_actual_events] START: user_id={user_id}")
+    try:
+        await callback.answer()
+        answer_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"[show_actual_events] ANSWERED: elapsed={answer_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[show_actual_events] ANSWER ERROR: {e}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
