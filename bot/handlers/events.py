@@ -147,8 +147,12 @@ async def back_to_list(callback: CallbackQuery) -> None:
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
-        await safe_delete(callback.message)
-        await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events))
+        keyboard = event_list_keyboard(events)
+        try:
+            await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[back_to_list] COMPLETED: total_elapsed={total_time:.3f}s")
 
@@ -167,16 +171,26 @@ async def event_list_page(callback: CallbackQuery) -> None:
     if not events:
         if callback.message:
             await _cleanup_media_group(callback.message)
-            await safe_delete(callback.message)
-            await callback.message.answer(
-                t("menu.actual_empty"),
-                reply_markup=back_to_main_keyboard(),
-            )
+            try:
+                await callback.message.edit_text(
+                    t("menu.actual_empty"),
+                    reply_markup=back_to_main_keyboard(),
+                )
+            except Exception:
+                await safe_delete(callback.message)
+                await callback.message.answer(
+                    t("menu.actual_empty"),
+                    reply_markup=back_to_main_keyboard(),
+                )
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
-        await safe_delete(callback.message)
-        await callback.message.answer(t("menu.actual_prompt"), reply_markup=event_list_keyboard(events, page=page))
+        keyboard = event_list_keyboard(events, page=page)
+        try:
+            await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
 
 
 @router.callback_query(
@@ -198,8 +212,11 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
 
     if callback.message:
         await _cleanup_media_group(callback.message)
-        await safe_delete(callback.message)
-        await callback.message.answer(text, reply_markup=markup)
+        try:
+            await callback.message.edit_text(text, reply_markup=markup)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
@@ -275,8 +292,11 @@ async def process_payment(callback: CallbackQuery) -> None:
     payment_message = None
     if callback.message:
         await _cleanup_media_group(callback.message)
-        await safe_delete(callback.message)
-        payment_message = await callback.message.answer(text, reply_markup=markup)
+        try:
+            payment_message = await callback.message.edit_text(text, reply_markup=markup)
+        except Exception:
+            await safe_delete(callback.message)
+            payment_message = await callback.message.answer(text, reply_markup=markup)
         
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
@@ -310,11 +330,17 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(promocode_event_id=event.id)
     if callback.message:
         await _cleanup_media_group(callback.message)
-        await safe_delete(callback.message)
-        await callback.message.answer(
-            t("promocode.prompt"),
-            reply_markup=promocode_back_keyboard(event.id),
-        )
+        try:
+            await callback.message.edit_text(
+                t("promocode.prompt"),
+                reply_markup=promocode_back_keyboard(event.id),
+            )
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(
+                t("promocode.prompt"),
+                reply_markup=promocode_back_keyboard(event.id),
+            )
 
 
 @router.message(PromocodeState.code)

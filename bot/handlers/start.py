@@ -59,8 +59,11 @@ async def open_main_menu(callback: CallbackQuery) -> None:
     display_name = escape(raw_name) if raw_name else t("start.fallback_name")
     keyboard = main_menu_keyboard(services.users.is_moderator(user))
     if callback.message:
-        await safe_delete(callback.message)
-        await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
+        try:
+            await callback.message.edit_text(t("menu.title", name=display_name), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[open_main_menu] COMPLETED: total_elapsed={total_time:.3f}s")
 

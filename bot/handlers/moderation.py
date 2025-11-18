@@ -610,8 +610,12 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.message:
         await _remove_prompt_message(callback.message, state)
         await _clear_preview_media(state, callback.message.bot)
-        await safe_delete(callback.message)
-        await callback.message.answer(t("create.published"), reply_markup=moderator_settings_keyboard())
+        keyboard = moderator_settings_keyboard()
+        try:
+            await callback.message.edit_text(t("create.published"), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("create.published"), reply_markup=keyboard)
     await state.clear()
 
 
@@ -636,8 +640,12 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
-            await safe_delete(callback.message)
-            await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
+            keyboard = moderator_settings_keyboard()
+            try:
+                await callback.message.edit_text(t("moderator.no_events"), reply_markup=keyboard)
+            except Exception:
+                await safe_delete(callback.message)
+                await callback.message.answer(t("moderator.no_events"), reply_markup=keyboard)
         return
     if callback.message:
         await safe_delete(callback.message)
@@ -677,8 +685,12 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
-            await safe_delete(callback.message)
-            await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
+            keyboard = moderator_settings_keyboard()
+            try:
+                await callback.message.edit_text(t("moderator.no_events"), reply_markup=keyboard)
+            except Exception:
+                await safe_delete(callback.message)
+                await callback.message.answer(t("moderator.no_events"), reply_markup=keyboard)
         return
     if callback.message:
         await safe_delete(callback.message)
@@ -900,8 +912,12 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
     await state.clear()
     if callback.message:
         await _remove_prompt_message(callback.message, state)
-        await safe_delete(callback.message)
-        await callback.message.answer(t("edit.event_cancelled_confirm"), reply_markup=moderator_settings_keyboard())
+        keyboard = moderator_settings_keyboard()
+        try:
+            await callback.message.edit_text(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
+        except Exception:
+            await safe_delete(callback.message)
+            await callback.message.answer(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX))
