@@ -99,13 +99,13 @@ async def show_event(callback: CallbackQuery) -> None:
         cleanup_start = message_id - 1
         logger.info(f"[show_event] Starting cleanup: message_id={message_id}, cleanup_start={cleanup_start}")
         asyncio.create_task(_cleanup_media_group(callback.message))
-        asyncio.create_task(safe_delete(callback.message))
-        if cleanup_start > 0:
-            logger.info(f"[show_event] Scheduling bulk delete: count=300")
-            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
         images = list(event.image_file_ids)
         send_start = datetime.now()
         if images:
+            await safe_delete(callback.message)
+            if cleanup_start > 0:
+                logger.info(f"[show_event] Scheduling bulk delete: count=300")
+                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
             if len(images) == 1:
                 try:
                     await asyncio.wait_for(
@@ -120,26 +120,43 @@ async def show_event(callback: CallbackQuery) -> None:
                     await bot.send_message(chat_id, text, reply_markup=markup)
             else:
                 text_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                async def _send_media_group_task():
-                    try:
-                        media = [InputMediaPhoto(media=file_id) for file_id in images]
-                        logger.info(f"[show_event] Sending media group: {len(images)} images")
-                        media_start = datetime.now()
-                        media_messages = await asyncio.wait_for(
-                            bot.send_media_group(chat_id, media),
-                            timeout=30.0
-                        )
-                        media_time = (datetime.now() - media_start).total_seconds()
-                        _remember_media_group(text_message, media_messages)
-                        send_time = (datetime.now() - send_start).total_seconds()
-                        logger.info(f"[show_event] Media group sent: media_elapsed={media_time:.3f}s, total_elapsed={send_time:.3f}s")
-                    except asyncio.TimeoutError:
-                        logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(images)} images")
-                    except Exception as e:
-                        logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
-                asyncio.create_task(_send_media_group_task())
+                valid_images = [file_id for file_id in images if file_id and file_id.strip()]
+                if len(valid_images) != len(images):
+                    logger.warning(f"[show_event] Invalid file_ids filtered: original={len(images)}, valid={len(valid_images)}")
+                if not valid_images:
+                    logger.error(f"[show_event] No valid images to send")
+                else:
+                    async def _send_media_group_task():
+                        try:
+                            media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
+                            logger.info(f"[show_event] Sending media group: {len(valid_images)} images")
+                            media_start = datetime.now()
+                            media_messages = await asyncio.wait_for(
+                                bot.send_media_group(chat_id, media),
+                                timeout=30.0
+                            )
+                            media_time = (datetime.now() - media_start).total_seconds()
+                            logger.info(f"[show_event] Media group sent: count={len(media_messages)}, media_elapsed={media_time:.3f}s")
+                            if len(media_messages) != len(valid_images):
+                                logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
+                            _remember_media_group(text_message, media_messages)
+                            send_time = (datetime.now() - send_start).total_seconds()
+                            logger.info(f"[show_event] Media group completed: total_elapsed={send_time:.3f}s")
+                        except asyncio.TimeoutError:
+                            logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
+                        except Exception as e:
+                            logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
+                    asyncio.create_task(_send_media_group_task())
         else:
-            await bot.send_message(chat_id, text, reply_markup=markup)
+            try:
+                await callback.message.edit_text(text, reply_markup=markup)
+            except Exception as e:
+                logger.warning(f"[show_event] Edit failed: {e}, deleting and sending new")
+                await safe_delete(callback.message)
+                await bot.send_message(chat_id, text, reply_markup=markup)
+            if cleanup_start > 0:
+                logger.info(f"[show_event] Scheduling bulk delete: count=300")
+                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
         send_time = (datetime.now() - send_start).total_seconds()
         logger.info(f"[show_event] Message sent: elapsed={send_time:.3f}s")
         total_time = (datetime.now() - start_time).total_seconds()
