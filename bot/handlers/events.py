@@ -109,10 +109,17 @@ async def show_event(callback: CallbackQuery) -> None:
             if len(images) == 1:
                 await bot.send_photo(chat_id, images[0], caption=text, reply_markup=markup)
             else:
-                media = [InputMediaPhoto(media=file_id) for file_id in images]
-                media_messages = await bot.send_media_group(chat_id, media)
                 text_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                _remember_media_group(text_message, media_messages)
+                async def _send_media_group_task():
+                    try:
+                        media = [InputMediaPhoto(media=file_id) for file_id in images]
+                        media_messages = await bot.send_media_group(chat_id, media)
+                        _remember_media_group(text_message, media_messages)
+                        send_time = (datetime.now() - send_start).total_seconds()
+                        logger.info(f"[show_event] Media group sent: elapsed={send_time:.3f}s")
+                    except Exception as e:
+                        logger.error(f"[show_event] Media group send ERROR: {e}")
+                asyncio.create_task(_send_media_group_task())
         else:
             await bot.send_message(chat_id, text, reply_markup=markup)
         send_time = (datetime.now() - send_start).total_seconds()
