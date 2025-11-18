@@ -494,8 +494,14 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
             )
             await safe_delete(message)
             return
-        images.append(message.photo[-1].file_id)
+        file_id = message.photo[-1].file_id
+        if not file_id:
+            logger.warning(f"[process_create_image] Empty file_id received")
+            await safe_delete(message)
+            return
+        images.append(file_id)
         await state.update_data(image_file_ids=images)
+        logger.info(f"[process_create_image] Image added: total={len(images)}, file_id={file_id[:20]}...")
         await _render_create_image_prompt(message, state)
         await safe_delete(message)
         return
@@ -605,7 +611,13 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
     data = await state.get_data()
     payload = _build_event_payload(data)
+    images_before = len(payload.get("image_file_ids", []))
     event = await services.events.create_event(payload)
+    if event:
+        images_after = len(event.image_file_ids) if event.image_file_ids else 0
+        logger.info(f"[publish_event] Event created: id={event.id}, images_before={images_before}, images_after={images_after}")
+        if images_before != images_after:
+            logger.warning(f"[publish_event] Image count mismatch: expected {images_before}, got {images_after}")
     await _notify_new_event(callback, event)
     if callback.message:
         await _remove_prompt_message(callback.message, state)
@@ -1024,13 +1036,19 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
     if callback.message:
         await _clear_notice_message(state, callback.message.bot)
         await _remove_prompt_message(callback.message, state)
-        await safe_delete(callback.message)
-        await _send_prompt_text(
-            callback.message,
-            state,
-            t("edit.event_options_prompt"),
-            manage_event_actions_keyboard(event_id),
-        )
+        text = t("edit.event_options_prompt")
+        markup = manage_event_actions_keyboard(event_id)
+        try:
+            edit_start = datetime.now()
+            await callback.message.edit_text(text, reply_markup=markup)
+            edit_time = (datetime.now() - edit_start).total_seconds()
+            logger.info(f"[open_event_actions] Message edited: elapsed={edit_time:.3f}s")
+            await _set_prompt_message(state, callback.message)
+        except Exception as e:
+            logger.warning(f"[open_event_actions] Edit failed: {e}, sending new message")
+            await safe_delete(callback.message)
+            sent = await callback.message.answer(text, reply_markup=markup)
+            await _set_prompt_message(state, sent)
     total_time = (datetime.now() - start_time).total_seconds()
     logger.info(f"[open_event_actions] COMPLETED: total_elapsed={total_time:.3f}s")
 
@@ -2034,6 +2052,7 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
 
 def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
     images = tuple(data.get("image_file_ids", []))
+    logger.info(f"[_build_event_payload] Building payload: images_count={len(images)}")
     return {
         "title": data.get("title"),
         "date": data.get("event_date"),
