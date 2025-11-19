@@ -102,25 +102,24 @@ async def show_event(callback: CallbackQuery) -> None:
         images = list(event.image_file_ids)
         send_start = datetime.now()
         if images:
-            await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            if cleanup_start > 0:
-                logger.info(f"[show_event] Scheduling bulk delete: count=300")
-                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
             if len(images) == 1:
                 try:
-                    await asyncio.wait_for(
+                    new_message = await asyncio.wait_for(
                         bot.send_photo(chat_id, images[0], caption=text, reply_markup=markup),
                         timeout=10.0
                     )
+                    await safe_delete(callback.message)
                 except asyncio.TimeoutError:
                     logger.error(f"[show_event] Single photo send TIMEOUT after 10s")
-                    await bot.send_message(chat_id, text, reply_markup=markup)
+                    new_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                    await safe_delete(callback.message)
                 except Exception as e:
                     logger.error(f"[show_event] Single photo send ERROR: {e}", exc_info=True)
-                    await bot.send_message(chat_id, text, reply_markup=markup)
+                    new_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                    await safe_delete(callback.message)
             else:
                 text_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                await safe_delete(callback.message)
                 valid_images = [file_id for file_id in images if file_id and file_id.strip()]
                 if len(valid_images) != len(images):
                     logger.warning(f"[show_event] Invalid file_ids filtered: original={len(images)}, valid={len(valid_images)}")
@@ -148,14 +147,16 @@ async def show_event(callback: CallbackQuery) -> None:
                         except Exception as e:
                             logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
                     asyncio.create_task(_send_media_group_task())
+            if cleanup_start > 0:
+                logger.info(f"[show_event] Scheduling bulk delete: count=300")
+                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
         else:
             try:
                 await callback.message.edit_text(text, reply_markup=markup)
             except Exception as e:
-                logger.warning(f"[show_event] Edit failed: {e}, deleting and sending new")
+                logger.warning(f"[show_event] Edit failed: {e}, sending new then deleting old")
+                new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
-                await asyncio.sleep(0.1)
-                await bot.send_message(chat_id, text, reply_markup=markup)
             if cleanup_start > 0:
                 logger.info(f"[show_event] Scheduling bulk delete: count=300")
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
@@ -183,12 +184,11 @@ async def back_to_list(callback: CallbackQuery) -> None:
     if not events:
         if callback.message:
             await _cleanup_media_group(callback.message)
-            await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            await callback.message.answer(
+            new_message = await callback.message.answer(
                 t("menu.actual_empty"),
                 reply_markup=back_to_main_keyboard(),
             )
+            await safe_delete(callback.message)
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
@@ -196,9 +196,8 @@ async def back_to_list(callback: CallbackQuery) -> None:
         try:
             await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
         except Exception:
+            new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[back_to_list] COMPLETED: total_elapsed={total_time:.3f}s")
 
@@ -223,12 +222,11 @@ async def event_list_page(callback: CallbackQuery) -> None:
                     reply_markup=back_to_main_keyboard(),
                 )
             except Exception:
-                await safe_delete(callback.message)
-                await asyncio.sleep(0.1)
-                await callback.message.answer(
+                new_message = await callback.message.answer(
                     t("menu.actual_empty"),
                     reply_markup=back_to_main_keyboard(),
                 )
+                await safe_delete(callback.message)
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
@@ -236,9 +234,8 @@ async def event_list_page(callback: CallbackQuery) -> None:
         try:
             await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
         except Exception:
+            new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
 
 
 @router.callback_query(
@@ -263,9 +260,8 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
         try:
             await callback.message.edit_text(text, reply_markup=markup)
         except Exception:
+            new_message = await callback.message.answer(text, reply_markup=markup)
             await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            await callback.message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
@@ -344,9 +340,8 @@ async def process_payment(callback: CallbackQuery) -> None:
         try:
             payment_message = await callback.message.edit_text(text, reply_markup=markup)
         except Exception:
-            await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
             payment_message = await callback.message.answer(text, reply_markup=markup)
+            await safe_delete(callback.message)
         
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
@@ -386,12 +381,11 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
                 reply_markup=promocode_back_keyboard(event.id),
             )
         except Exception:
-            await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            await callback.message.answer(
+            new_message = await callback.message.answer(
                 t("promocode.prompt"),
                 reply_markup=promocode_back_keyboard(event.id),
             )
+            await safe_delete(callback.message)
 
 
 @router.message(PromocodeState.code)

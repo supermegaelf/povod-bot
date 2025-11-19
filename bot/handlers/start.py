@@ -63,9 +63,8 @@ async def open_main_menu(callback: CallbackQuery) -> None:
         try:
             await callback.message.edit_text(t("menu.title", name=display_name), reply_markup=keyboard)
         except Exception:
+            new_message = await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await asyncio.sleep(0.1)
-            await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[open_main_menu] COMPLETED: total_elapsed={total_time:.3f}s")
 

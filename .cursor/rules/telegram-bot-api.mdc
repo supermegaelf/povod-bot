@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+Ты эксперт по Telegram Bot API.
+Всегда используй актуальную официальную документацию: https://core.telegram.org/bots/api
+Для Python используй aiogram 3.x или python-telegram-bot 21+.
+Обязательно проверяй методы на актуальность, не используй устаревшие (например, getUpdates вместо long polling только если нужно).
