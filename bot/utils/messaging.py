@@ -2,6 +2,17 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import Message
 
+_LAST_USER_MESSAGES: dict[int, int] = {}
+
+
+def remember_user_message(message: Message) -> None:
+    if message.chat:
+        _LAST_USER_MESSAGES[message.chat.id] = message.message_id
+
+
+def get_last_user_message_id(chat_id: int) -> int | None:
+    return _LAST_USER_MESSAGES.get(chat_id)
+
 
 async def safe_delete_message(bot, chat_id: int, message_id: int | None) -> None:
     if not message_id:
@@ -38,11 +49,14 @@ async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_
     deleted_count = 0
     failed_count = 0
     max_failed = 10
+    last_user_message_id = get_last_user_message_id(chat_id)
     
     for i in range(count):
         message_id = start_message_id - i
         if message_id <= 0:
             break
+        if last_user_message_id and message_id == last_user_message_id:
+            continue
         try:
             await bot.delete_message(chat_id, message_id)
             deleted_count += 1

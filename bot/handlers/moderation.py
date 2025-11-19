@@ -64,7 +64,7 @@ from bot.utils.callbacks import (
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.constants import MAX_EVENT_IMAGES
-from bot.utils.messaging import safe_delete, safe_delete_message, safe_delete_by_id
+from bot.utils.messaging import remember_user_message, safe_delete, safe_delete_message, safe_delete_by_id
 from bot.utils.i18n import t
 
 router = Router()
@@ -244,6 +244,7 @@ async def create_event_images_confirm(callback: CallbackQuery, state: FSMContext
 
 @router.message(CreateEventState.title)
 async def process_create_title(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     if not text:
         await _send_prompt_text(
@@ -268,6 +269,7 @@ async def process_create_title(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.date)
 async def process_create_date(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     try:
         start_date, end_date = _parse_date_input(text)
@@ -311,6 +313,7 @@ async def process_create_date(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.time)
 async def process_create_time(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     lowered = text.lower()
     if not text:
@@ -359,6 +362,7 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.period)
 async def process_create_period(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     lowered = text.lower()
     if not text or lowered in {"пропустить", "skip"}:
@@ -399,6 +403,7 @@ async def process_create_period(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.place)
 async def process_create_place(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     lowered = text.lower()
     await _push_create_history(state, CreateEventState.place)
@@ -418,6 +423,7 @@ async def process_create_place(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.description)
 async def process_create_description(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     await _push_create_history(state, CreateEventState.description)
     if text and text.lower() not in {"пропустить", "skip"}:
@@ -436,6 +442,7 @@ async def process_create_description(message: Message, state: FSMContext) -> Non
 
 @router.message(CreateEventState.cost)
 async def process_create_cost(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     raw_text = (message.text or "").strip()
     if not raw_text or raw_text.lower() in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.cost)
@@ -477,6 +484,7 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.image)
 async def process_create_image(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     data = await state.get_data()
     images = list(data.get("image_file_ids", []))
     if message.photo:
@@ -545,6 +553,7 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.limit)
 async def process_create_limit(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     if not text or text.lower() in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.limit)
@@ -802,6 +811,7 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(EditEventState.broadcast)
 async def process_broadcast(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     if not text:
         await _send_prompt_text(
@@ -1180,6 +1190,7 @@ async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.message(PromocodeAdminState.code_input)
 async def process_promocode_code_input(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     current_state = await state.get_state()
     if current_state != PromocodeAdminState.code_input.state:
         return
@@ -1240,6 +1251,7 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
 
 @router.message(PromocodeAdminState.discount_input)
 async def process_promocode_discount_input(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     data = await state.get_data()
     event_id = data.get("promocode_event_id")
@@ -1513,6 +1525,7 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(EditEventState.value_input)
 async def process_edit_value(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     field = data.get("edit_field")
@@ -1570,6 +1583,7 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
 
 @router.message(EditEventState.image_upload)
 async def process_edit_images(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     data = await state.get_data()
     images = list(data.get("new_image_file_ids", []))
     if message.photo:
