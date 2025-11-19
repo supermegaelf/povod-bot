@@ -413,6 +413,16 @@ async def process_create_description(message: Message, state: FSMContext) -> Non
     text = (message.text or "").strip()
     await _push_create_history(state, CreateEventState.description)
     if text and text.lower() not in {"пропустить", "skip"}:
+        from bot.utils.constants import MAX_DESCRIPTION_LENGTH
+        if len(text) > MAX_DESCRIPTION_LENGTH:
+            await _send_prompt_text(
+                message,
+                state,
+                t("create.description_too_long"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+            await safe_delete(message)
+            return
         await state.update_data(description=text)
     else:
         await state.update_data(description=None)
@@ -2185,7 +2195,11 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
             return {"place": None}
         return {"place": value}
     if field == "description":
-        return {field: (message.text or "").strip() or None}
+        from bot.utils.constants import MAX_DESCRIPTION_LENGTH
+        value = (message.text or "").strip() or None
+        if value and len(value) > MAX_DESCRIPTION_LENGTH:
+            raise ValueError(t("edit.description_too_long"))
+        return {field: value}
     if field == "cost":
         raw_text = (message.text or "").strip()
         if not raw_text or raw_text.lower() in {"пропустить", "skip"}:
