@@ -35,8 +35,8 @@ async def show_actual_events(callback: CallbackQuery) -> None:
             try:
                 await callback.message.edit_text(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
             except Exception:
+                new_message = await callback.message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
                 await safe_delete(callback.message)
-                await callback.message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
         return
     if callback.message:
         keyboard = event_list_keyboard(events)
@@ -53,8 +53,8 @@ async def show_actual_events(callback: CallbackQuery) -> None:
                 logger.info(f"[show_actual_events] Message too old: age={message_age/60:.1f}m, sending new")
         
         if message_too_old:
+            new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         else:
             try:
                 edit_start = datetime.now()
@@ -63,8 +63,8 @@ async def show_actual_events(callback: CallbackQuery) -> None:
                 logger.info(f"[show_actual_events] Message edited: elapsed={edit_time:.3f}s")
             except Exception as e:
                 logger.warning(f"[show_actual_events] Edit failed: {e}, sending new message")
+                new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
                 await safe_delete(callback.message)
-                await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[show_actual_events] COMPLETED: total_elapsed={total_time:.3f}s")
 
@@ -94,12 +94,12 @@ async def show_community(callback: CallbackQuery) -> None:
                 disable_web_page_preview=True,
             )
         except Exception:
-            await safe_delete(callback.message)
-            await callback.message.answer(
+            new_message = await callback.message.answer(
                 text,
                 reply_markup=back_to_main_keyboard(),
                 disable_web_page_preview=True,
             )
+            await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == MENU_SETTINGS)
@@ -118,6 +118,6 @@ async def show_settings(callback: CallbackQuery) -> None:
         try:
             await callback.message.edit_text(t("moderator.settings_title"), reply_markup=keyboard)
         except Exception:
+            new_message = await callback.message.answer(t("moderator.settings_title"), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await callback.message.answer(t("moderator.settings_title"), reply_markup=keyboard)
 

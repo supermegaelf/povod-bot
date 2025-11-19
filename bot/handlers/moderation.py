@@ -108,13 +108,13 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
     await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
     await state.set_state(CreateEventState.title)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("create.title_prompt"),
             create_step_keyboard(back_enabled=True),
         )
+        await safe_delete(callback.message)
     total_time = (datetime.now() - start_time).total_seconds()
     logger.info(f"[start_create_event] COMPLETED: total_elapsed={total_time:.3f}s")
 
@@ -139,8 +139,8 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
     target_state = CREATE_STATE_BY_NAME[target_state_name]
     await state.set_state(target_state)
     if callback.message:
-        await safe_delete(callback.message)
         await _prompt_create_state(callback.message, state, target_state)
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == CREATE_EVENT_SKIP)
@@ -626,8 +626,8 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
         try:
             await callback.message.edit_text(t("create.published"), reply_markup=keyboard)
         except Exception:
+            new_message = await callback.message.answer(t("create.published"), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await callback.message.answer(t("create.published"), reply_markup=keyboard)
     await state.clear()
 
 
@@ -660,13 +660,13 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
                 await callback.message.answer(t("moderator.no_events"), reply_markup=keyboard)
         return
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("menu.actual_prompt"),
             manage_events_keyboard(events),
         )
+        await safe_delete(callback.message)
     await state.update_data(edit_stack=[])
     total_time = (datetime.now() - start_time).total_seconds()
     logger.info(f"[open_manage_events] COMPLETED: total_elapsed={total_time:.3f}s")
@@ -705,13 +705,13 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
                 await callback.message.answer(t("moderator.no_events"), reply_markup=keyboard)
         return
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("menu.actual_prompt"),
             manage_events_keyboard(events, page=page),
         )
+        await safe_delete(callback.message)
     await state.update_data(edit_stack=[])
     total_time = (datetime.now() - start_time).total_seconds()
     logger.info(f"[manage_events_page] COMPLETED: total_elapsed={total_time:.3f}s")
@@ -731,20 +731,20 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         await _push_edit_stack(state, "fields")
         await state.set_state(EditEventState.selecting_field)
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         return
     if field == "reminders":
         await _push_edit_stack(state, "reminders")
         await state.set_state(EditEventState.reminders)
         if callback.message:
-            await safe_delete(callback.message)
             await _prompt_edit_reminders(callback.message, state, event_id)
+            await safe_delete(callback.message)
         return
     services = get_services()
     if field == "image":
@@ -757,8 +757,8 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(EditEventState.image_upload)
         await state.update_data(edit_field=field, new_image_file_ids=existing_images, images_dirty=False)
         if callback.message:
-            await safe_delete(callback.message)
             await _render_edit_image_prompt(callback.message, state)
+            await safe_delete(callback.message)
         return
     event = await services.events.get_event(event_id)
     if event is None:
@@ -768,13 +768,13 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(EditEventState.value_input)
     await state.update_data(edit_field=field)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             _compose_edit_prompt(event, field),
             edit_step_keyboard(),
         )
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == EDIT_EVENT_BROADCAST)
@@ -791,13 +791,13 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
     await _push_edit_stack(state, "broadcast")
     await state.set_state(EditEventState.broadcast)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("moderator.broadcast_prompt"),
             edit_step_keyboard(),
         )
+        await safe_delete(callback.message)
 
 
 @router.message(EditEventState.broadcast)
@@ -897,13 +897,13 @@ async def confirm_cancel_request(callback: CallbackQuery, state: FSMContext) -> 
     await _push_edit_stack(state, "cancel")
     await state.set_state(EditEventState.confirmation)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("moderator.cancel_confirm_prompt"),
             cancel_event_keyboard(event_id),
         )
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CONFIRM_CANCEL_PREFIX))
@@ -928,8 +928,8 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
         try:
             await callback.message.edit_text(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
         except Exception:
+            new_message = await callback.message.answer(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
             await safe_delete(callback.message)
-            await callback.message.answer(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX))
@@ -966,14 +966,14 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
     if callback.message:
         await _push_edit_stack(state, "participants")
         await state.update_data(edit_event_id=event_id, edit_stack=["actions", "participants"])
-        await safe_delete(callback.message)
         if not participants:
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("moderator.participants_empty"),
                 participants_list_keyboard(event_id, participants_count=0, page=0),
             )
+            await safe_delete(callback.message)
         else:
             page_size = 10
             total_participants = len(participants)
@@ -1046,8 +1046,8 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
             await _set_prompt_message(state, callback.message)
         except Exception as e:
             logger.warning(f"[open_event_actions] Edit failed: {e}, sending new message")
-            await safe_delete(callback.message)
             sent = await callback.message.answer(text, reply_markup=markup)
+            await safe_delete(callback.message)
             await _set_prompt_message(state, sent)
     total_time = (datetime.now() - start_time).total_seconds()
     logger.info(f"[open_event_actions] COMPLETED: total_elapsed={total_time:.3f}s")
@@ -1076,13 +1076,13 @@ async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.menu_prompt"),
             manage_promocode_actions_keyboard(event_id),
         )
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":list:"))
@@ -1113,14 +1113,14 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
     )
     promocodes = await services.promocodes.list_promocodes(event_id)
     if callback.message:
-        await safe_delete(callback.message)
         if not promocodes:
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("promocode.admin.list_empty"),
                 promocode_list_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         else:
             event_date_str = event.date.strftime("%d.%m.%Y")
             if event.time:
@@ -1169,13 +1169,13 @@ async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> Non
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.add_code_prompt"),
             promocode_input_keyboard(event_id),
         )
+        await safe_delete(callback.message)
 
 
 @router.message(PromocodeAdminState.code_input)
@@ -1326,13 +1326,13 @@ async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> 
     promocodes = await services.promocodes.list_promocodes(event_id)
     if not promocodes:
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("promocode.admin.list_empty"),
                 manage_promocode_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         return
     data = await state.get_data()
     existing_stack = list(data.get("edit_stack", []))
@@ -1346,13 +1346,13 @@ async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> 
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.delete_code_prompt"),
             promocode_input_keyboard(event_id),
         )
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith("promocode:back_menu:"))
@@ -1378,13 +1378,13 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.menu_prompt"),
             manage_promocode_actions_keyboard(event_id),
         )
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == EDIT_EVENT_BACK)
@@ -1416,94 +1416,95 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
         logger.info(f"[edit_back] DB get_active_events: elapsed={db_time:.3f}s")
         await state.clear()
         if callback.message:
-            await safe_delete(callback.message)
             if events:
-                await _send_prompt_text(
+                sent = await _send_prompt_text(
                     callback.message,
                     state,
                     t("menu.actual_prompt"),
                     manage_events_keyboard(events),
                 )
                 await state.update_data(edit_stack=[])
+                await safe_delete(callback.message)
             else:
-                await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
+                new_message = await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
+                await safe_delete(callback.message)
         return
     if callback.message:
         await _clear_notice_message(state, callback.message.bot)
     current = stack[-1] if stack else None
     if current == "fields":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.set_state(EditEventState.selecting_field)
     elif current == "images":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.update_data(new_image_file_ids=[])
         await state.set_state(EditEventState.selecting_field)
     elif current == "promocodes":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("promocode.admin.menu_prompt"),
                 manage_promocode_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.set_state(EditEventState.selecting_field)
     elif current == "participants":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.event_options_prompt"),
                 manage_event_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
     elif current == "actions":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.event_options_prompt"),
                 manage_event_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
     elif current == "cancel":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.event_options_prompt"),
                 manage_event_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
     else:
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.set_state(EditEventState.selecting_field)
     
     total_time = (datetime.now() - start_time).total_seconds()
@@ -1749,8 +1750,8 @@ async def _set_prompt_message(state: FSMContext, message: Message | None) -> Non
 
 
 async def _send_prompt_text(message: Message, state: FSMContext, text: str, reply_markup) -> Message:
-    await _remove_prompt_message(message, state)
     sent = await message.answer(text, reply_markup=reply_markup)
+    await _remove_prompt_message(message, state)
     await _set_prompt_message(state, sent)
     return sent
 
