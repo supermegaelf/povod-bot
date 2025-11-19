@@ -100,28 +100,31 @@ async def show_event(callback: CallbackQuery) -> None:
                     new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                     await safe_delete(callback.message)
             else:
-                text_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
                 valid_images = [file_id for file_id in images if file_id and file_id.strip()]
                 if len(valid_images) != len(images):
                     logger.warning(f"[show_event] Invalid file_ids filtered: original={len(images)}, valid={len(valid_images)}")
                 if not valid_images:
                     logger.error(f"[show_event] No valid images to send")
+                    new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 else:
                     async def _send_media_group_task():
                         try:
                             media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
+                            media[0] = InputMediaPhoto(media=valid_images[0], caption=text)
                             media_messages = await asyncio.wait_for(
-                                bot.send_media_group(chat_id, media),
+                                bot.send_media_group(chat_id, media, reply_markup=markup),
                                 timeout=30.0
                             )
                             if len(media_messages) != len(valid_images):
                                 logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
-                            _remember_media_group(text_message, media_messages)
+                            _remember_media_group(media_messages[0] if media_messages else None, media_messages)
                         except asyncio.TimeoutError:
                             logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
+                            new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                         except Exception as e:
                             logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
+                            new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                     asyncio.create_task(_send_media_group_task())
             if cleanup_start > 0:
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
@@ -447,9 +450,9 @@ async def refund_event(callback: CallbackQuery) -> None:
                 await callback.message.answer_photo(images[0], caption=text, reply_markup=markup)
             else:
                 media = [InputMediaPhoto(media=file_id) for file_id in images]
-                media_messages = await callback.message.answer_media_group(media)
-                text_message = await callback.message.answer(text, reply_markup=markup)
-                _remember_media_group(text_message, media_messages)
+                media[0] = InputMediaPhoto(media=images[0], caption=text)
+                media_messages = await callback.message.answer_media_group(media, reply_markup=markup)
+                _remember_media_group(media_messages[0] if media_messages else None, media_messages)
         else:
             await callback.message.answer(text, reply_markup=markup)
 
