@@ -1550,7 +1550,7 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
         await _update_prompt_message(
             message,
             state,
-            t("edit.images_cleared", limit=MAX_EVENT_IMAGES, count=0),
+            t("edit.images_cleared"),
             edit_images_keyboard(False, False),
         )
         await safe_delete(message)
@@ -1586,7 +1586,7 @@ async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext)
         await _update_prompt_message(
             callback.message,
             state,
-            t("edit.images_cleared", limit=MAX_EVENT_IMAGES, count=0),
+            t("edit.images_cleared"),
             edit_images_keyboard(False, False),
         )
 
@@ -1711,7 +1711,7 @@ async def _render_create_image_prompt(message: Message, state: FSMContext) -> No
     await _update_prompt_message(
         message,
         state,
-        t("create.image_prompt", limit=MAX_EVENT_IMAGES, count=count),
+        t("create.image_prompt"),
         create_step_keyboard(
             back_enabled=True,
             skip_enabled=True,
@@ -1727,7 +1727,7 @@ async def _render_edit_image_prompt(message: Message, state: FSMContext) -> None
     await _update_prompt_message(
         message,
         state,
-        t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=count),
+            t("edit.prompt_image"),
         edit_images_keyboard(count > 0, dirty),
     )
 
@@ -2083,7 +2083,7 @@ def _edit_prompt_for(field: str) -> str:
         "place": t("edit.prompt_place"),
         "description": t("edit.prompt_description"),
         "cost": t("edit.prompt_cost"),
-        "image": t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=0),
+        "image": t("edit.prompt_image"),
         "limit": t("edit.prompt_limit"),
     }
     return prompts.get(field, t("edit.prompt_value_fallback"))
