@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from bot.utils.callbacks import MENU_ACTUAL_EVENTS, MENU_COMMUNITY, MENU_SETTINGS
 from bot.utils.di import get_config, get_services
 from bot.utils.i18n import t
-from bot.utils.messaging import safe_delete
+from bot.utils.messaging import safe_answer_callback, safe_delete
 
 router = Router()
 
@@ -28,7 +28,7 @@ async def show_actual_events(callback: CallbackQuery) -> None:
             except Exception:
                 new_message = await callback.message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
                 await safe_delete(callback.message)
-        await callback.answer()
+        await safe_answer_callback(callback)
         return
     if callback.message:
         keyboard = event_list_keyboard(events)
@@ -53,7 +53,7 @@ async def show_actual_events(callback: CallbackQuery) -> None:
                 logger.warning(f"[show_actual_events] Edit failed: {e}, sending new message")
                 new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
                 await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(F.data == MENU_COMMUNITY)
@@ -84,7 +84,7 @@ async def show_community(callback: CallbackQuery) -> None:
                 disable_web_page_preview=True,
             )
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(F.data == MENU_SETTINGS)
@@ -93,7 +93,7 @@ async def show_settings(callback: CallbackQuery) -> None:
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
+        await safe_answer_callback(callback, text=t("common.no_permissions"), show_alert=True)
         return
     if callback.message:
         keyboard = moderator_settings_keyboard()
@@ -102,5 +102,5 @@ async def show_settings(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("moderator.settings_title"), reply_markup=keyboard)
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 

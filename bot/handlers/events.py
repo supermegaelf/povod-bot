@@ -29,7 +29,7 @@ from bot.utils.callbacks import (
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.i18n import t
-from bot.utils.messaging import remember_user_message, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
 from bot.keyboards.event_card import promocode_back_keyboard
 
 router = Router()
@@ -134,7 +134,7 @@ async def show_event(callback: CallbackQuery) -> None:
                 await safe_delete(callback.message)
             if cleanup_start > 0:
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
@@ -157,7 +157,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
                     reply_markup=back_to_main_keyboard(),
                 )
                 await safe_delete(callback.message)
-        await callback.answer()
+        await safe_answer_callback(callback)
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
@@ -167,7 +167,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
@@ -191,7 +191,7 @@ async def event_list_page(callback: CallbackQuery) -> None:
                     reply_markup=back_to_main_keyboard(),
                 )
                 await safe_delete(callback.message)
-        await callback.answer()
+        await safe_answer_callback(callback)
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
@@ -201,7 +201,7 @@ async def event_list_page(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(
@@ -224,7 +224,7 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(text, reply_markup=markup)
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
@@ -242,7 +242,7 @@ async def process_payment(callback: CallbackQuery) -> None:
     services = get_services()
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
 
     tg_user = callback.from_user
@@ -254,7 +254,7 @@ async def process_payment(callback: CallbackQuery) -> None:
     amount = max((event.cost or 0) - discount, 0)
 
     if method != "card":
-        await callback.answer(t("payment.method_not_available"), show_alert=True)
+        await safe_answer_callback(callback, text=t("payment.method_not_available"), show_alert=True)
         return
 
     try:
@@ -266,11 +266,11 @@ async def process_payment(callback: CallbackQuery) -> None:
         )
     except Exception as e:
         logger.error(f"[process_payment] Payment creation ERROR: {e}")
-        await callback.answer(t("payment.create_failed"), show_alert=True)
+        await safe_answer_callback(callback, text=t("payment.create_failed"), show_alert=True)
         return
 
     if not confirmation_url:
-        await callback.answer(t("payment.create_failed"), show_alert=True)
+        await safe_answer_callback(callback, text=t("payment.create_failed"), show_alert=True)
         return
 
     text = t("payment.prompt", amount=amount, title=event.title)
@@ -293,7 +293,7 @@ async def process_payment(callback: CallbackQuery) -> None:
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
     
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
@@ -328,7 +328,7 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
                 reply_markup=promocode_back_keyboard(event.id),
             )
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 @router.message(PromocodeState.code)
@@ -392,7 +392,7 @@ async def refund_event(callback: CallbackQuery) -> None:
     event_id = extract_event_id(callback.data, EVENT_REFUND_PREFIX)
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     
     tg_user = callback.from_user
@@ -400,7 +400,7 @@ async def refund_event(callback: CallbackQuery) -> None:
     
     is_registered = await services.registrations.is_registered(event.id, user.id)
     if not is_registered:
-        await callback.answer(t("event.refund.not_registered"), show_alert=True)
+        await safe_answer_callback(callback, text=t("event.refund.not_registered"), show_alert=True)
         return
     
     payment = None
@@ -410,19 +410,19 @@ async def refund_event(callback: CallbackQuery) -> None:
         if payment:
             refund_success = await services.payments.refund_payment(payment.payment_id, payment.amount)
             if not refund_success:
-                await callback.answer(t("event.refund.payment_failed"), show_alert=True)
+                await safe_answer_callback(callback, text=t("event.refund.payment_failed"), show_alert=True)
                 return
     
     try:
         await services.registrations.remove_participant(event.id, user.id)
     except Exception:
-        await callback.answer(t("event.refund.error"), show_alert=True)
+        await safe_answer_callback(callback, text=t("event.refund.error"), show_alert=True)
         return
     
     if payment:
-        await callback.answer(t("event.refund.success_with_payment"), show_alert=True)
+        await safe_answer_callback(callback, text=t("event.refund.success_with_payment"), show_alert=True)
     else:
-        await callback.answer(t("event.refund.success"), show_alert=True)
+        await safe_answer_callback(callback, text=t("event.refund.success"), show_alert=True)
     
     is_paid = False
     if is_paid_event:
