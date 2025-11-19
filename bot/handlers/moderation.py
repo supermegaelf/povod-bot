@@ -95,9 +95,6 @@ CREATE_STATE_BY_NAME = {state.state: state for state in CREATE_STATE_SEQUENCE}
 
 @router.callback_query(F.data == SETTINGS_CREATE_EVENT)
 async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[start_create_event] START: user_id={user_id}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -115,15 +112,10 @@ async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None
             create_step_keyboard(back_enabled=True),
         )
         await safe_delete(callback.message)
-    total_time = (datetime.now() - start_time).total_seconds()
-    logger.info(f"[start_create_event] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 @router.callback_query(F.data == CREATE_EVENT_BACK)
 async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[create_event_back] START: user_id={user_id}")
     data = await state.get_data()
     history = list(data.get("history", []))
     await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
@@ -145,9 +137,6 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_SKIP)
 async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[create_event_skip] START: user_id={user_id}")
     current_state = await state.get_state()
     if current_state is None:
         return
@@ -223,9 +212,6 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_IMAGES_CONFIRM)
 async def create_event_images_confirm(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[create_event_images_confirm] START: user_id={user_id}")
     current_state = await state.get_state()
     if current_state != CreateEventState.image.state:
         return
@@ -583,27 +569,18 @@ async def process_create_limit(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_REMINDER_TOGGLE_3)
 async def toggle_create_reminder_3(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[toggle_create_reminder_3] START: user_id={user_id}")
     await _toggle_reminder(state, key="reminder_3days")
     await _edit_reminder_markup(callback, state)
 
 
 @router.callback_query(F.data == CREATE_EVENT_REMINDER_TOGGLE_1)
 async def toggle_create_reminder_1(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[toggle_create_reminder_1] START: user_id={user_id}")
     await _toggle_reminder(state, key="reminder_1day")
     await _edit_reminder_markup(callback, state)
 
 
 @router.callback_query(F.data == CREATE_EVENT_REMINDER_DONE)
 async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[finish_reminders] START: user_id={user_id}")
     await _push_create_history(state, CreateEventState.reminders)
     await state.set_state(CreateEventState.preview)
     if callback.message:
@@ -614,9 +591,6 @@ async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == CREATE_EVENT_PUBLISH)
 async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[publish_event] START: user_id={user_id}")
     services = get_services()
     data = await state.get_data()
     payload = _build_event_payload(data)
@@ -642,22 +616,13 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == SETTINGS_MANAGE_EVENTS)
 async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[open_manage_events] START: user_id={user_id}")
     services = get_services()
     tg_user = callback.from_user
-    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[open_manage_events] DB ensure user: elapsed={db_time:.3f}s")
     if not services.users.is_moderator(user):
         return
     await state.clear()
-    db_start = datetime.now()
     events = await services.events.get_active_events(limit=20)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[open_manage_events] DB get_active_events: elapsed={db_time:.3f}s")
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -677,32 +642,20 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
         )
         await safe_delete(callback.message)
     await state.update_data(edit_stack=[])
-    total_time = (datetime.now() - start_time).total_seconds()
-    logger.info(f"[open_manage_events] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 @router.callback_query(F.data.startswith(MANAGE_EVENTS_PAGE_PREFIX))
 async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[manage_events_page] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
     services = get_services()
     tg_user = callback.from_user
-    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[manage_events_page] DB ensure user: elapsed={db_time:.3f}s")
     if not services.users.is_moderator(user):
         await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     page = int(callback.data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
-    db_start = datetime.now()
     events = await services.events.get_active_events(limit=20)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[manage_events_page] DB get_active_events: elapsed={db_time:.3f}s")
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -722,16 +675,10 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
         )
         await safe_delete(callback.message)
     await state.update_data(edit_stack=[])
-    total_time = (datetime.now() - start_time).total_seconds()
-    logger.info(f"[manage_events_page] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_FIELD_PREFIX))
 async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[handle_edit_entry] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
     event_id, field = extract_event_id_and_field(callback.data, EDIT_EVENT_FIELD_PREFIX)
@@ -788,9 +735,6 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == EDIT_EVENT_BROADCAST)
 async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[start_broadcast] START: user_id={user_id}")
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
@@ -887,9 +831,6 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == HIDE_MESSAGE)
 async def hide_message(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[hide_message] START: user_id={user_id}")
     if callback.message:
         await safe_delete(callback.message)
 
@@ -944,10 +885,6 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX))
 async def show_participants_page(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_participants_page] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
     event_id, page = extract_event_id_and_page(callback.data, EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX)
@@ -956,10 +893,6 @@ async def show_participants_page(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PREFIX))
 async def show_participants(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_participants] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_PARTICIPANTS_PREFIX)
@@ -1022,18 +955,11 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PREFIX))
 async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[open_event_actions] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_PREFIX)
     services = get_services()
-    db_start = datetime.now()
     event = await services.events.get_event(event_id)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[open_event_actions] DB get_event: elapsed={db_time:.3f}s")
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
@@ -1049,18 +975,13 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
         text = t("edit.event_options_prompt")
         markup = manage_event_actions_keyboard(event_id)
         try:
-            edit_start = datetime.now()
             await callback.message.edit_text(text, reply_markup=markup)
-            edit_time = (datetime.now() - edit_start).total_seconds()
-            logger.info(f"[open_event_actions] Message edited: elapsed={edit_time:.3f}s")
             await _set_prompt_message(state, callback.message)
         except Exception as e:
             logger.warning(f"[open_event_actions] Edit failed: {e}, sending new message")
             sent = await callback.message.answer(text, reply_markup=markup)
             await safe_delete(callback.message)
             await _set_prompt_message(state, sent)
-    total_time = (datetime.now() - start_time).total_seconds()
-    logger.info(f"[open_event_actions] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 @router.callback_query(F.data.startswith("promocode:menu:"))
@@ -1401,9 +1322,6 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data == EDIT_EVENT_BACK)
 async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[edit_back] START: user_id={user_id}")
     data = await state.get_data()
     stack = list(data.get("edit_stack", []))
     if not stack:
@@ -1422,10 +1340,7 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
         return
     if not stack:
         services = get_services()
-        db_start = datetime.now()
         events = await services.events.get_active_events()
-        db_time = (datetime.now() - db_start).total_seconds()
-        logger.info(f"[edit_back] DB get_active_events: elapsed={db_time:.3f}s")
         await state.clear()
         if callback.message:
             if events:
@@ -1645,9 +1560,6 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == EDIT_EVENT_CLEAR_IMAGES)
 async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[clear_edit_images_callback] START: user_id={user_id}")
     current_state = await state.get_state()
     if current_state != EditEventState.image_upload.state:
         return
@@ -1674,9 +1586,6 @@ async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data == EDIT_EVENT_SAVE)
 async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[handle_edit_save] START: user_id={user_id}")
     current_state = await state.get_state()
     data = await state.get_data()
     event_id = data.get("edit_event_id")

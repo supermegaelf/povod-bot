@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import timezone
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
@@ -17,19 +17,10 @@ router = Router()
 
 @router.callback_query(F.data == MENU_ACTUAL_EVENTS)
 async def show_actual_events(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_actual_events] START: user_id={user_id}")
     services = get_services()
     tg_user = callback.from_user
-    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[show_actual_events] DB ensure user: elapsed={db_time:.3f}s")
-    db_start = datetime.now()
     events = await services.events.get_active_events()
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[show_actual_events] DB get_active_events: elapsed={db_time:.3f}s")
     if not events:
         if callback.message:
             try:
@@ -43,39 +34,30 @@ async def show_actual_events(callback: CallbackQuery) -> None:
         keyboard = event_list_keyboard(events)
         message_too_old = False
         if callback.message.date:
-            from datetime import timezone as tz
             message_date = callback.message.date
             if message_date.tzinfo is None:
-                message_date = message_date.replace(tzinfo=tz.utc)
-            now = datetime.now(tz.utc)
+                message_date = message_date.replace(tzinfo=timezone.utc)
+            from datetime import datetime
+            now = datetime.now(timezone.utc)
             message_age = (now - message_date).total_seconds()
             if message_age > 3600:
                 message_too_old = True
-                logger.info(f"[show_actual_events] Message too old: age={message_age/60:.1f}m, sending new")
         
         if message_too_old:
             new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
         else:
             try:
-                edit_start = datetime.now()
                 await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
-                edit_time = (datetime.now() - edit_start).total_seconds()
-                logger.info(f"[show_actual_events] Message edited: elapsed={edit_time:.3f}s")
             except Exception as e:
                 logger.warning(f"[show_actual_events] Edit failed: {e}, sending new message")
                 new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
                 await safe_delete(callback.message)
-        total_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[show_actual_events] COMPLETED: total_elapsed={total_time:.3f}s")
     await callback.answer()
 
 
 @router.callback_query(F.data == MENU_COMMUNITY)
 async def show_community(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_community] START: user_id={user_id}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
@@ -107,9 +89,6 @@ async def show_community(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == MENU_SETTINGS)
 async def show_settings(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_settings] START: user_id={user_id}")
     services = get_services()
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)

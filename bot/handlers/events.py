@@ -39,24 +39,14 @@ _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
 
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
 async def show_event(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_event] START: data={callback_data[:50]}, user_id={user_id}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_VIEW_PREFIX)
-    db_start = datetime.now()
     event = await services.events.get_event(event_id)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[show_event] DB get_event: elapsed={db_time:.3f}s")
     if event is None:
         return
     
     tg_user = callback.from_user
-    user_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
-    user_time = (datetime.now() - user_start).total_seconds()
-    logger.info(f"[show_event] DB ensure user: elapsed={user_time:.3f}s")
     is_paid_event = bool(event.cost and event.cost > 0)
     
     tasks = [services.registrations.get_stats(event.id)]
@@ -66,10 +56,7 @@ async def show_event(callback: CallbackQuery) -> None:
     
     tasks.append(services.registrations.is_registered(event.id, user.id))
     
-    db_start = datetime.now()
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[show_event] DB gather tasks: elapsed={db_time:.3f}s")
     
     stats = results[0] if not isinstance(results[0], Exception) else None
     task_idx = 1
@@ -81,10 +68,7 @@ async def show_event(callback: CallbackQuery) -> None:
     
     discount = 0.0
     if is_paid_event and not is_paid:
-        db_start = datetime.now()
         discount = await services.promocodes.get_user_discount(event.id, user.id)
-        db_time = (datetime.now() - db_start).total_seconds()
-        logger.info(f"[show_event] DB get_user_discount: elapsed={db_time:.3f}s")
     
     if stats is None:
         stats = type('Stats', (), {'going': 0})()
@@ -97,10 +81,8 @@ async def show_event(callback: CallbackQuery) -> None:
         bot = callback.message.bot
         message_id = callback.message.message_id
         cleanup_start = message_id - 1
-        logger.info(f"[show_event] Starting cleanup: message_id={message_id}, cleanup_start={cleanup_start}")
         asyncio.create_task(_cleanup_media_group(callback.message))
         images = list(event.image_file_ids)
-        send_start = datetime.now()
         if images:
             if len(images) == 1:
                 try:
@@ -129,26 +111,19 @@ async def show_event(callback: CallbackQuery) -> None:
                     async def _send_media_group_task():
                         try:
                             media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
-                            logger.info(f"[show_event] Sending media group: {len(valid_images)} images")
-                            media_start = datetime.now()
                             media_messages = await asyncio.wait_for(
                                 bot.send_media_group(chat_id, media),
                                 timeout=30.0
                             )
-                            media_time = (datetime.now() - media_start).total_seconds()
-                            logger.info(f"[show_event] Media group sent: count={len(media_messages)}, media_elapsed={media_time:.3f}s")
                             if len(media_messages) != len(valid_images):
                                 logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
                             _remember_media_group(text_message, media_messages)
-                            send_time = (datetime.now() - send_start).total_seconds()
-                            logger.info(f"[show_event] Media group completed: total_elapsed={send_time:.3f}s")
                         except asyncio.TimeoutError:
                             logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
                         except Exception as e:
                             logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
                     asyncio.create_task(_send_media_group_task())
             if cleanup_start > 0:
-                logger.info(f"[show_event] Scheduling bulk delete: count=300")
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
         else:
             try:
@@ -158,30 +133,16 @@ async def show_event(callback: CallbackQuery) -> None:
                 new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
             if cleanup_start > 0:
-                logger.info(f"[show_event] Scheduling bulk delete: count=300")
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
-        send_time = (datetime.now() - send_start).total_seconds()
-        logger.info(f"[show_event] Message sent: elapsed={send_time:.3f}s")
-        total_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[show_event] COMPLETED: total_elapsed={total_time:.3f}s")
     await callback.answer()
 
 
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
 async def back_to_list(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[back_to_list] START: user_id={user_id}")
     services = get_services()
     tg_user = callback.from_user
-    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[back_to_list] DB ensure user: elapsed={db_time:.3f}s")
-    db_start = datetime.now()
     events = await services.events.get_active_events()
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[back_to_list] DB get_active_events: elapsed={db_time:.3f}s")
     if not events:
         if callback.message:
             await _cleanup_media_group(callback.message)
@@ -200,17 +161,11 @@ async def back_to_list(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
-        total_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"[back_to_list] COMPLETED: total_elapsed={total_time:.3f}s")
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
 async def event_list_page(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[event_list_page] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
     page = int(callback.data.removeprefix(EVENT_LIST_PAGE_PREFIX))
@@ -247,10 +202,6 @@ async def event_list_page(callback: CallbackQuery) -> None:
     F.data.startswith(EVENT_PAYMENT_PREFIX) & ~F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX)
 )
 async def show_payment_methods(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[show_payment_methods] START: data={callback_data[:50]}, user_id={user_id}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PAYMENT_PREFIX)
     event = await services.events.get_event(event_id)
@@ -272,10 +223,6 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
 async def process_payment(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[process_payment] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
         return
 
@@ -287,26 +234,17 @@ async def process_payment(callback: CallbackQuery) -> None:
         return
 
     services = get_services()
-    db_start = datetime.now()
     event = await services.events.get_event(event_id)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[process_payment] DB get_event: elapsed={db_time:.3f}s")
     if event is None:
         await callback.answer(t("error.event_not_found"), show_alert=True)
         return
 
     tg_user = callback.from_user
-    db_start = datetime.now()
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
-    db_time = (datetime.now() - db_start).total_seconds()
-    logger.info(f"[process_payment] DB ensure user: elapsed={db_time:.3f}s")
 
     discount = 0.0
     if event.cost:
-        db_start = datetime.now()
         discount = await services.promocodes.get_user_discount(event.id, user.id)
-        db_time = (datetime.now() - db_start).total_seconds()
-        logger.info(f"[process_payment] DB get_user_discount: elapsed={db_time:.3f}s")
     amount = max((event.cost or 0) - discount, 0)
 
     if method != "card":
@@ -314,15 +252,12 @@ async def process_payment(callback: CallbackQuery) -> None:
         return
 
     try:
-        payment_start = datetime.now()
         payment_id, confirmation_url = await services.payments.create_payment(
             event_id=event.id,
             user_id=user.id,
             amount=amount,
             description=t("payment.description", title=event.title),
         )
-        payment_time = (datetime.now() - payment_start).total_seconds()
-        logger.info(f"[process_payment] Payment created: elapsed={payment_time:.3f}s, payment_id={payment_id}")
     except Exception as e:
         logger.error(f"[process_payment] Payment creation ERROR: {e}")
         await callback.answer(t("payment.create_failed"), show_alert=True)
@@ -352,17 +287,11 @@ async def process_payment(callback: CallbackQuery) -> None:
         if payment_message:
             await services.payments.update_message_id(payment_id, payment_message.message_id)
     
-    total_time = (datetime.now() - start_time).total_seconds()
-    logger.info(f"[process_payment] COMPLETED: elapsed={total_time:.3f}s")
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
 async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[start_promocode] START: data={callback_data[:50]}, user_id={user_id}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_PROMOCODE_PREFIX)
     event = await services.events.get_event(event_id)
@@ -453,10 +382,6 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith(EVENT_REFUND_PREFIX))
 async def refund_event(callback: CallbackQuery) -> None:
-    start_time = datetime.now()
-    callback_data = callback.data or "None"
-    user_id = callback.from_user.id if callback.from_user else 0
-    logger.info(f"[refund_event] START: data={callback_data[:50]}, user_id={user_id}")
     services = get_services()
     event_id = extract_event_id(callback.data, EVENT_REFUND_PREFIX)
     event = await services.events.get_event(event_id)
