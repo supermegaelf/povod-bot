@@ -259,7 +259,7 @@ class MessageRefreshMiddleware(BaseMiddleware):
             display_name = escape(raw_name) if raw_name else t("start.fallback_name")
             config = get_config()
             text = t("menu.title", name=display_name, about_us_url=config.support.about_us_url)
-            await callback.message.edit_text(text, reply_markup=markup)
+            await callback.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
             return True
         
         return False
