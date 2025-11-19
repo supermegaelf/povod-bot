@@ -122,12 +122,8 @@ async def show_event(callback: CallbackQuery) -> None:
                             if len(media_messages) != len(valid_images):
                                 logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
                             if media_messages:
-                                last_message = media_messages[-1]
-                                try:
-                                    await last_message.edit_reply_markup(reply_markup=markup)
-                                except Exception as e:
-                                    logger.warning(f"[show_event] Failed to add reply_markup to media group: {e}")
-                            _remember_media_group(media_messages[0] if media_messages else None, media_messages)
+                                _remember_media_group(media_messages[0], media_messages)
+                                await bot.send_message(chat_id, " ", reply_markup=markup)
                         except asyncio.TimeoutError:
                             logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
                             new_message = await bot.send_message(chat_id, text, reply_markup=markup)
@@ -136,7 +132,7 @@ async def show_event(callback: CallbackQuery) -> None:
                             new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                     asyncio.create_task(_send_media_group_task())
             if cleanup_start > 0:
-                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
+                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
         else:
             try:
                 await callback.message.edit_text(text, reply_markup=markup)
@@ -145,7 +141,7 @@ async def show_event(callback: CallbackQuery) -> None:
                 new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
             if cleanup_start > 0:
-                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=300))
+                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
     await safe_answer_callback(callback)
 
 
@@ -465,12 +461,8 @@ async def refund_event(callback: CallbackQuery) -> None:
                 media[0] = InputMediaPhoto(media=images[0], caption=caption_text)
                 media_messages = await callback.message.answer_media_group(media)
                 if media_messages:
-                    last_message = media_messages[-1]
-                    try:
-                        await last_message.edit_reply_markup(reply_markup=markup)
-                    except Exception as e:
-                        logger.warning(f"[refund_event] Failed to add reply_markup to media group: {e}")
-                _remember_media_group(media_messages[0] if media_messages else None, media_messages)
+                    _remember_media_group(media_messages[0], media_messages)
+                    await callback.message.answer(" ", reply_markup=markup)
         else:
             await callback.message.answer(text, reply_markup=markup)
 
