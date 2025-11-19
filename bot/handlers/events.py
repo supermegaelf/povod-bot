@@ -111,27 +111,34 @@ async def show_event(callback: CallbackQuery) -> None:
                     logger.error(f"[show_event] No valid images to send")
                     new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 else:
-                    async def _send_media_group_task():
-                        try:
-                            media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
-                            media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
-                            media_messages = await asyncio.wait_for(
-                                bot.send_media_group(chat_id, media),
-                                timeout=30.0
-                            )
-                            if len(media_messages) != len(valid_images):
-                                logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
-                            if media_messages:
-                                _remember_media_group(media_messages[0], media_messages)
-                                await bot.send_message(chat_id, " ", reply_markup=markup)
-                        except asyncio.TimeoutError:
-                            logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
-                            new_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                        except Exception as e:
-                            logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
-                            new_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                    asyncio.create_task(_send_media_group_task())
-            if cleanup_start > 0:
+                    try:
+                        media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
+                        media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
+                        media_messages = await asyncio.wait_for(
+                            bot.send_media_group(chat_id, media),
+                            timeout=30.0
+                        )
+                        if len(media_messages) != len(valid_images):
+                            logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
+                        if media_messages:
+                            _remember_media_group(media_messages[0], media_messages)
+                            buttons_message = await bot.send_message(chat_id, " ", reply_markup=markup)
+                            if cleanup_start > 0:
+                                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50, exclude_message_id=buttons_message.message_id))
+                        else:
+                            if cleanup_start > 0:
+                                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
+                    except asyncio.TimeoutError:
+                        logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
+                        new_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                        if cleanup_start > 0:
+                            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
+                    except Exception as e:
+                        logger.error(f"[show_event] Media group send ERROR: {e}", exc_info=True)
+                        new_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                        if cleanup_start > 0:
+                            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
+            if cleanup_start > 0 and not images:
                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
         else:
             try:
@@ -462,7 +469,7 @@ async def refund_event(callback: CallbackQuery) -> None:
                 media_messages = await callback.message.answer_media_group(media)
                 if media_messages:
                     _remember_media_group(media_messages[0], media_messages)
-                    await callback.message.answer(" ", reply_markup=markup)
+                    buttons_message = await callback.message.answer(" ", reply_markup=markup)
         else:
             await callback.message.answer(text, reply_markup=markup)
 
