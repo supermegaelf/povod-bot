@@ -113,11 +113,17 @@ async def show_event(callback: CallbackQuery) -> None:
                             media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
                             media[0] = InputMediaPhoto(media=valid_images[0], caption=text)
                             media_messages = await asyncio.wait_for(
-                                bot.send_media_group(chat_id, media, reply_markup=markup),
+                                bot.send_media_group(chat_id, media),
                                 timeout=30.0
                             )
                             if len(media_messages) != len(valid_images):
                                 logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
+                            if media_messages:
+                                last_message = media_messages[-1]
+                                try:
+                                    await last_message.edit_reply_markup(reply_markup=markup)
+                                except Exception as e:
+                                    logger.warning(f"[show_event] Failed to add reply_markup to media group: {e}")
                             _remember_media_group(media_messages[0] if media_messages else None, media_messages)
                         except asyncio.TimeoutError:
                             logger.error(f"[show_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
@@ -451,7 +457,13 @@ async def refund_event(callback: CallbackQuery) -> None:
             else:
                 media = [InputMediaPhoto(media=file_id) for file_id in images]
                 media[0] = InputMediaPhoto(media=images[0], caption=text)
-                media_messages = await callback.message.answer_media_group(media, reply_markup=markup)
+                media_messages = await callback.message.answer_media_group(media)
+                if media_messages:
+                    last_message = media_messages[-1]
+                    try:
+                        await last_message.edit_reply_markup(reply_markup=markup)
+                    except Exception as e:
+                        logger.warning(f"[refund_event] Failed to add reply_markup to media group: {e}")
                 _remember_media_group(media_messages[0] if media_messages else None, media_messages)
         else:
             await callback.message.answer(text, reply_markup=markup)
