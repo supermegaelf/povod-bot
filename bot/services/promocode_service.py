@@ -24,8 +24,8 @@ class PromocodeService:
         if not normalized_code:
             return PromocodeResult(success=False, error_code="not_found")
 
-        promocode = await self._repository.get_by_code(normalized_code)
-        if promocode is None or promocode.event_id != event_id or not promocode.is_active:
+        promocode = await self._repository.get_by_code(event_id, normalized_code)
+        if promocode is None or not promocode.is_active:
             return PromocodeResult(success=False, error_code="not_found")
 
         event = await self._events.get_event(event_id)
@@ -37,11 +37,18 @@ class PromocodeService:
         if now >= event_start:
             return PromocodeResult(success=False, error_code="expired")
 
-        if promocode.used_at is not None:
+        if await self._repository.is_used_by_user(promocode.id, user_id):
             return PromocodeResult(success=False, error_code="already_used")
 
-        await self._repository.mark_used(promocode.id, user_id, now.replace(tzinfo=None))
-        return PromocodeResult(success=True, discount=promocode.discount_amount)
+        try:
+            await self._repository.mark_used(promocode.id, user_id, now.replace(tzinfo=None))
+            if await self._repository.is_used_by_user(promocode.id, user_id):
+                return PromocodeResult(success=True, discount=promocode.discount_amount)
+            return PromocodeResult(success=False, error_code="already_used")
+        except Exception as e:
+            if await self._repository.is_used_by_user(promocode.id, user_id):
+                return PromocodeResult(success=True, discount=promocode.discount_amount)
+            raise
 
     async def get_user_discount(self, event_id: int, user_id: int) -> float:
         return await self._repository.get_user_discount(event_id, user_id)
@@ -54,8 +61,8 @@ class PromocodeService:
         expires_at: Optional[datetime],
     ) -> None:
         normalized_code = code.strip().upper()
-        existing = await self._repository.get_by_code(normalized_code)
-        if existing is not None and existing.event_id == event_id:
+        existing = await self._repository.get_by_code(event_id, normalized_code)
+        if existing is not None:
             from bot.utils.i18n import t
             raise ValueError(t("promocode.admin.duplicate"))
         await self._repository.create(event_id, normalized_code, discount_amount, expires_at)

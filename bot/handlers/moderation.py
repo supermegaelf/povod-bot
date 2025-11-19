@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
+
+logger = logging.getLogger(__name__)
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html import escape
 from typing import Any, Callable, Optional, TypeVar
 
@@ -23,9 +25,11 @@ from bot.keyboards import (
     edit_images_keyboard,
     edit_reminders_keyboard,
     edit_step_keyboard,
+    hide_message_keyboard,
     manage_event_actions_keyboard,
     manage_events_keyboard,
     manage_promocode_actions_keyboard,
+    participants_list_keyboard,
     promocode_input_keyboard,
     promocode_list_keyboard,
     moderator_settings_keyboard,
@@ -33,7 +37,6 @@ from bot.keyboards import (
 )
 from bot.utils.callbacks import (
     CREATE_EVENT_BACK,
-    CREATE_EVENT_CANCEL,
     CREATE_EVENT_IMAGES_CONFIRM,
     CREATE_EVENT_PUBLISH,
     CREATE_EVENT_REMINDER_DONE,
@@ -48,17 +51,20 @@ from bot.utils.callbacks import (
     EDIT_EVENT_BROADCAST,
     EDIT_EVENT_CANCEL_EVENT_PREFIX,
     EDIT_EVENT_CONFIRM_CANCEL_PREFIX,
+    EDIT_EVENT_PARTICIPANTS_PREFIX,
+    EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX,
     HIDE_MESSAGE,
     MANAGE_EVENTS_PAGE_PREFIX,
     SETTINGS_CREATE_EVENT,
     SETTINGS_MANAGE_EVENTS,
     extract_event_id,
     extract_event_id_and_field,
+    extract_event_id_and_page,
 )
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.constants import MAX_EVENT_IMAGES
-from bot.utils.messaging import safe_delete, safe_delete_message, safe_delete_by_id
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_message, safe_delete_by_id
 from bot.utils.i18n import t
 
 router = Router()
@@ -91,23 +97,21 @@ CREATE_STATE_BY_NAME = {state.state: state for state in CREATE_STATE_SEQUENCE}
 async def start_create_event(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     await state.clear()
     await state.update_data(history=[], image_file_ids=[])
     await _clear_preview_media(state, callback.message.bot if callback.message else callback.bot)
     await state.set_state(CreateEventState.title)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("create.title_prompt"),
             create_step_keyboard(back_enabled=True),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == CREATE_EVENT_BACK)
@@ -121,34 +125,20 @@ async def create_event_back(callback: CallbackQuery, state: FSMContext) -> None:
             await _remove_prompt_message(callback.message, state)
             await safe_delete(callback.message)
             await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
-        await callback.answer()
         return
     target_state_name = history.pop()
     await state.update_data(history=history)
     target_state = CREATE_STATE_BY_NAME[target_state_name]
     await state.set_state(target_state)
     if callback.message:
-        await safe_delete(callback.message)
         await _prompt_create_state(callback.message, state, target_state)
-    await callback.answer()
-
-
-@router.callback_query(F.data == CREATE_EVENT_CANCEL)
-async def create_event_cancel(callback: CallbackQuery, state: FSMContext) -> None:
-    if callback.message:
-        await _remove_prompt_message(callback.message, state)
         await safe_delete(callback.message)
-        await _clear_preview_media(state, callback.message.bot)
-        await callback.message.answer(t("create.cancelled"), reply_markup=moderator_settings_keyboard())
-    await state.clear()
-    await callback.answer()
 
 
 @router.callback_query(F.data == CREATE_EVENT_SKIP)
 async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
     current_state = await state.get_state()
     if current_state is None:
-        await callback.answer()
         return
     if current_state == CreateEventState.cost.state:
         await _push_create_history(state, CreateEventState.cost)
@@ -218,14 +208,12 @@ async def create_event_skip(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(CreateEventState.reminders)
         if callback.message:
             await _prompt_reminders(callback.message, state)
-    await callback.answer()
 
 
 @router.callback_query(F.data == CREATE_EVENT_IMAGES_CONFIRM)
 async def create_event_images_confirm(callback: CallbackQuery, state: FSMContext) -> None:
     current_state = await state.get_state()
     if current_state != CreateEventState.image.state:
-        await callback.answer()
         return
     await _push_create_history(state, CreateEventState.image)
     data = await state.get_data()
@@ -238,11 +226,11 @@ async def create_event_images_confirm(callback: CallbackQuery, state: FSMContext
             t("create.limit_prompt"),
             create_step_keyboard(back_enabled=True, skip_enabled=True),
         )
-    await callback.answer()
 
 
 @router.message(CreateEventState.title)
 async def process_create_title(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     if not text:
         await _send_prompt_text(
@@ -267,6 +255,7 @@ async def process_create_title(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.date)
 async def process_create_date(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     try:
         start_date, end_date = _parse_date_input(text)
@@ -310,6 +299,7 @@ async def process_create_date(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.time)
 async def process_create_time(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     lowered = text.lower()
     if not text:
@@ -358,6 +348,7 @@ async def process_create_time(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.period)
 async def process_create_period(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     lowered = text.lower()
     if not text or lowered in {"пропустить", "skip"}:
@@ -398,6 +389,7 @@ async def process_create_period(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.place)
 async def process_create_place(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     lowered = text.lower()
     await _push_create_history(state, CreateEventState.place)
@@ -417,9 +409,20 @@ async def process_create_place(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.description)
 async def process_create_description(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     await _push_create_history(state, CreateEventState.description)
     if text and text.lower() not in {"пропустить", "skip"}:
+        from bot.utils.constants import MAX_DESCRIPTION_LENGTH
+        if len(text) > MAX_DESCRIPTION_LENGTH:
+            await _send_prompt_text(
+                message,
+                state,
+                t("create.description_too_long"),
+                create_step_keyboard(back_enabled=True, skip_enabled=True),
+            )
+            await safe_delete(message)
+            return
         await state.update_data(description=text)
     else:
         await state.update_data(description=None)
@@ -435,6 +438,7 @@ async def process_create_description(message: Message, state: FSMContext) -> Non
 
 @router.message(CreateEventState.cost)
 async def process_create_cost(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     raw_text = (message.text or "").strip()
     if not raw_text or raw_text.lower() in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.cost)
@@ -476,6 +480,7 @@ async def process_create_cost(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.image)
 async def process_create_image(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     data = await state.get_data()
     images = list(data.get("image_file_ids", []))
     if message.photo:
@@ -493,8 +498,14 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
             )
             await safe_delete(message)
             return
-        images.append(message.photo[-1].file_id)
+        file_id = message.photo[-1].file_id
+        if not file_id:
+            logger.warning(f"[process_create_image] Empty file_id received")
+            await safe_delete(message)
+            return
+        images.append(file_id)
         await state.update_data(image_file_ids=images)
+        logger.info(f"[process_create_image] Image added: total={len(images)}, file_id={file_id[:20]}...")
         await _render_create_image_prompt(message, state)
         await safe_delete(message)
         return
@@ -538,6 +549,7 @@ async def process_create_image(message: Message, state: FSMContext) -> None:
 
 @router.message(CreateEventState.limit)
 async def process_create_limit(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     if not text or text.lower() in {"пропустить", "skip"}:
         await _push_create_history(state, CreateEventState.limit)
@@ -585,7 +597,6 @@ async def finish_reminders(callback: CallbackQuery, state: FSMContext) -> None:
         await _clear_preview_media(state, callback.message.bot)
         await _send_preview(callback.message, state)
         await safe_delete(callback.message)
-    await callback.answer()
 
 
 @router.callback_query(F.data == CREATE_EVENT_PUBLISH)
@@ -593,82 +604,92 @@ async def publish_event(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
     data = await state.get_data()
     payload = _build_event_payload(data)
+    images_before = len(payload.get("image_file_ids", []))
     event = await services.events.create_event(payload)
+    if event:
+        images_after = len(event.image_file_ids) if event.image_file_ids else 0
+        logger.info(f"[publish_event] Event created: id={event.id}, images_before={images_before}, images_after={images_after}")
+        if images_before != images_after:
+            logger.warning(f"[publish_event] Image count mismatch: expected {images_before}, got {images_after}")
     await _notify_new_event(callback, event)
     if callback.message:
         await _remove_prompt_message(callback.message, state)
         await _clear_preview_media(state, callback.message.bot)
-        await safe_delete(callback.message)
-        await callback.message.answer(t("create.published"), reply_markup=moderator_settings_keyboard())
+        keyboard = moderator_settings_keyboard()
+        try:
+            await callback.message.edit_text(t("create.published"), reply_markup=keyboard)
+        except Exception:
+            new_message = await callback.message.answer(t("create.published"), reply_markup=keyboard)
+            await safe_delete(callback.message)
     await state.clear()
-    await callback.answer()
 
 
 @router.callback_query(F.data == SETTINGS_MANAGE_EVENTS)
 async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None:
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
         return
     await state.clear()
     events = await services.events.get_active_events(limit=20)
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
-            await safe_delete(callback.message)
-            await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
-        await callback.answer()
+            keyboard = moderator_settings_keyboard()
+            try:
+                await callback.message.edit_text(t("moderator.no_events"), reply_markup=keyboard)
+            except Exception:
+                await safe_delete(callback.message)
+                await callback.message.answer(t("moderator.no_events"), reply_markup=keyboard)
         return
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("menu.actual_prompt"),
             manage_events_keyboard(events),
         )
+        await safe_delete(callback.message)
     await state.update_data(edit_stack=[])
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(MANAGE_EVENTS_PAGE_PREFIX))
 async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.data is None:
-        await callback.answer()
         return
     services = get_services()
     tg_user = callback.from_user
-    user = await services.users.ensure(tg_user.id, tg_user.username)
+    user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
+        await safe_answer_callback(callback, text=t("common.no_permissions"), show_alert=True)
         return
     page = int(callback.data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
     events = await services.events.get_active_events(limit=20)
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
-            await safe_delete(callback.message)
-            await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
-        await callback.answer()
+            keyboard = moderator_settings_keyboard()
+            try:
+                await callback.message.edit_text(t("moderator.no_events"), reply_markup=keyboard)
+            except Exception:
+                await safe_delete(callback.message)
+                await callback.message.answer(t("moderator.no_events"), reply_markup=keyboard)
         return
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("menu.actual_prompt"),
             manage_events_keyboard(events, page=page),
         )
+        await safe_delete(callback.message)
     await state.update_data(edit_stack=[])
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_FIELD_PREFIX))
 async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.data is None:
-        await callback.answer()
         return
     event_id, field = extract_event_id_and_field(callback.data, EDIT_EVENT_FIELD_PREFIX)
     await _ensure_event_context(state, event_id)
@@ -676,47 +697,60 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         await _push_edit_stack(state, "fields")
         await state.set_state(EditEventState.selecting_field)
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
-        await callback.answer()
+            await safe_delete(callback.message)
         return
     if field == "reminders":
         await _push_edit_stack(state, "reminders")
         await state.set_state(EditEventState.reminders)
         if callback.message:
-            await safe_delete(callback.message)
             await _prompt_edit_reminders(callback.message, state, event_id)
-        await callback.answer()
+            await safe_delete(callback.message)
         return
+    services = get_services()
     if field == "image":
-        services = get_services()
         event = await services.events.get_event(event_id)
-        existing_images = list(event.image_file_ids) if event else []
+        if event is None:
+            await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
+            return
+        existing_images = list(event.image_file_ids)
         await _push_edit_stack(state, "images")
         await state.set_state(EditEventState.image_upload)
         await state.update_data(edit_field=field, new_image_file_ids=existing_images, images_dirty=False)
         if callback.message:
+            from bot.handlers.events import _cleanup_media_group
+            await _cleanup_media_group(callback.message)
+            chat_id = callback.message.chat.id
+            bot = callback.message.bot
             await safe_delete(callback.message)
-            await _render_edit_image_prompt(callback.message, state)
-        await callback.answer()
+            sent = await bot.send_message(
+                chat_id,
+                t("edit.prompt_image"),
+                reply_markup=edit_images_keyboard(len(existing_images) > 0, False),
+            )
+            await _set_prompt_message(state, sent)
+        await safe_answer_callback(callback)
+        return
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     await _push_edit_stack(state, "value")
     await state.set_state(EditEventState.value_input)
     await state.update_data(edit_field=field)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
-            _edit_prompt_for(field),
+            _compose_edit_prompt(event, field),
             edit_step_keyboard(),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == EDIT_EVENT_BROADCAST)
@@ -724,24 +758,24 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
     await _push_edit_stack(state, "broadcast")
     await state.set_state(EditEventState.broadcast)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("moderator.broadcast_prompt"),
             edit_step_keyboard(),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.message(EditEventState.broadcast)
 async def process_broadcast(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     if not text:
         await _send_prompt_text(
@@ -819,59 +853,135 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
 async def hide_message(callback: CallbackQuery) -> None:
     if callback.message:
         await safe_delete(callback.message)
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CANCEL_EVENT_PREFIX))
 async def confirm_cancel_request(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[confirm_cancel_request] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
-        await callback.answer()
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_CANCEL_EVENT_PREFIX)
     await _ensure_event_context(state, event_id)
     await _push_edit_stack(state, "cancel")
     await state.set_state(EditEventState.confirmation)
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("moderator.cancel_confirm_prompt"),
             cancel_event_keyboard(event_id),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CONFIRM_CANCEL_PREFIX))
 async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[cancel_event_confirm] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
-        await callback.answer()
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_CONFIRM_CANCEL_PREFIX)
     services = get_services()
     event = await services.events.cancel_event(event_id)
     if event is None:
-        await callback.answer(t("error.cancel_failed"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.cancel_failed"), show_alert=True)
         return
     await _notify_cancellation(callback, event)
     await state.clear()
     if callback.message:
         await _remove_prompt_message(callback.message, state)
-        await safe_delete(callback.message)
-        await callback.message.answer(t("edit.event_cancelled_confirm"), reply_markup=moderator_settings_keyboard())
-    await callback.answer()
+        keyboard = moderator_settings_keyboard()
+        try:
+            await callback.message.edit_text(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
+        except Exception:
+            new_message = await callback.message.answer(t("edit.event_cancelled_confirm"), reply_markup=keyboard)
+            await safe_delete(callback.message)
+
+
+@router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX))
+async def show_participants_page(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        return
+    event_id, page = extract_event_id_and_page(callback.data, EDIT_EVENT_PARTICIPANTS_PAGE_PREFIX)
+    await _render_participants_list(callback, state, event_id, page=page)
+
+
+@router.callback_query(F.data.startswith(EDIT_EVENT_PARTICIPANTS_PREFIX))
+async def show_participants(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.data is None:
+        return
+    event_id = extract_event_id(callback.data, EDIT_EVENT_PARTICIPANTS_PREFIX)
+    await _render_participants_list(callback, state, event_id, page=0)
+
+
+async def _render_participants_list(callback: CallbackQuery, state: FSMContext, event_id: int, page: int = 0) -> None:
+    services = get_services()
+    event = await services.events.get_event(event_id)
+    if event is None:
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
+        return
+    participants = await services.registrations.list_paid_participants(event_id)
+    if callback.message:
+        await _push_edit_stack(state, "participants")
+        await state.update_data(edit_event_id=event_id, edit_stack=["actions", "participants"])
+        if not participants:
+            sent = await _send_prompt_text(
+                callback.message,
+                state,
+                t("moderator.participants_empty"),
+                participants_list_keyboard(event_id, participants_count=0, page=0),
+            )
+            await safe_delete(callback.message)
+        else:
+            page_size = 10
+            total_participants = len(participants)
+            start_idx = page * page_size
+            end_idx = min(start_idx + page_size, total_participants)
+            page_participants = participants[start_idx:end_idx]
+            
+            lines = []
+            for idx, participant in enumerate(page_participants, start=start_idx + 1):
+                full_name_parts = []
+                if participant.first_name:
+                    full_name_parts.append(participant.first_name)
+                if participant.last_name:
+                    full_name_parts.append(participant.last_name)
+                full_name = " ".join(full_name_parts) if full_name_parts else None
+                
+                if participant.username:
+                    username_part = f"@{participant.username}"
+                elif participant.telegram_id:
+                    username_part = str(participant.telegram_id)
+                else:
+                    username_part = str(participant.user_id)
+                
+                if full_name:
+                    lines.append(f"{idx}. {full_name} ({username_part})")
+                else:
+                    lines.append(f"{idx}. {username_part}")
+            text = "\n".join(lines)
+            await _send_prompt_text(
+                callback.message,
+                state,
+                text,
+                participants_list_keyboard(event_id, participants_count=total_participants, page=page),
+            )
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_PREFIX))
 async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.data is None:
-        await callback.answer()
         return
     event_id = extract_event_id(callback.data, EDIT_EVENT_PREFIX)
     services = get_services()
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     await state.clear()
     await state.set_state(EditEventState.selecting_field)
@@ -882,24 +992,28 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
     if callback.message:
         await _clear_notice_message(state, callback.message.bot)
         await _remove_prompt_message(callback.message, state)
-        await safe_delete(callback.message)
-        await _send_prompt_text(
-            callback.message,
-            state,
-            t("edit.event_options_prompt"),
-            manage_event_actions_keyboard(event_id),
-        )
-    await callback.answer()
+        text = t("edit.event_options_prompt")
+        markup = manage_event_actions_keyboard(event_id)
+        try:
+            await callback.message.edit_text(text, reply_markup=markup)
+            await _set_prompt_message(state, callback.message)
+        except Exception as e:
+            logger.warning(f"[open_event_actions] Edit failed: {e}, sending new message")
+            sent = await callback.message.answer(text, reply_markup=markup)
+            await safe_delete(callback.message)
+            await _set_prompt_message(state, sent)
 
 
 @router.callback_query(F.data.startswith("promocode:menu:"))
 async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[promocode_menu] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
-        await callback.answer()
         return
     parts = callback.data.split(":")
     if len(parts) != 3:
-        await callback.answer()
         return
     event_id = int(parts[2])
     data = await state.get_data()
@@ -913,30 +1027,31 @@ async def promocode_menu(callback: CallbackQuery, state: FSMContext) -> None:
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.menu_prompt"),
             manage_promocode_actions_keyboard(event_id),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":list:"))
 async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[list_event_promocodes] START: data={callback_data[:50]}, user_id={user_id}")
     services = get_services()
     if callback.data is None:
-        await callback.answer()
         return
     payload = callback.data.split(":")
     if len(payload) != 3:
-        await callback.answer()
         return
     event_id = int(payload[2])
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     data = await state.get_data()
     existing_stack = list(data.get("edit_stack", []))
@@ -949,14 +1064,14 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
     )
     promocodes = await services.promocodes.list_promocodes(event_id)
     if callback.message:
-        await safe_delete(callback.message)
         if not promocodes:
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("promocode.admin.list_empty"),
                 promocode_list_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         else:
             event_date_str = event.date.strftime("%d.%m.%Y")
             if event.time:
@@ -980,17 +1095,18 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
                 text,
                 promocode_list_keyboard(event_id),
             )
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":add:"))
 async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[start_add_promocode] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
-        await callback.answer()
         return
     parts = callback.data.split(":")
     if len(parts) != 3:
-        await callback.answer()
         return
     event_id = int(parts[2])
     data = await state.get_data()
@@ -1004,18 +1120,18 @@ async def start_add_promocode(callback: CallbackQuery, state: FSMContext) -> Non
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.add_code_prompt"),
             promocode_input_keyboard(event_id),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.message(PromocodeAdminState.code_input)
 async def process_promocode_code_input(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     current_state = await state.get_state()
     if current_state != PromocodeAdminState.code_input.state:
         return
@@ -1076,6 +1192,7 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
 
 @router.message(PromocodeAdminState.discount_input)
 async def process_promocode_discount_input(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     text = (message.text or "").strip()
     data = await state.get_data()
     event_id = data.get("promocode_event_id")
@@ -1148,26 +1265,27 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("promocode:") & F.data.contains(":delete:"))
 async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[start_delete_promocode] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
-        await callback.answer()
         return
     parts = callback.data.split(":")
     if len(parts) != 3:
-        await callback.answer()
         return
     event_id = int(parts[2])
     services = get_services()
     promocodes = await services.promocodes.list_promocodes(event_id)
     if not promocodes:
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("promocode.admin.list_empty"),
                 manage_promocode_actions_keyboard(event_id),
             )
-        await callback.answer()
+            await safe_delete(callback.message)
         return
     data = await state.get_data()
     existing_stack = list(data.get("edit_stack", []))
@@ -1181,24 +1299,25 @@ async def start_delete_promocode(callback: CallbackQuery, state: FSMContext) -> 
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.delete_code_prompt"),
             promocode_input_keyboard(event_id),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data.startswith("promocode:back_menu:"))
 async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    start_time = datetime.now()
+    callback_data = callback.data or "None"
+    user_id = callback.from_user.id if callback.from_user else 0
+    logger.info(f"[promocode_back_menu] START: data={callback_data[:50]}, user_id={user_id}")
     if callback.data is None:
-        await callback.answer()
         return
     parts = callback.data.split(":")
     if len(parts) != 3:
-        await callback.answer()
         return
     event_id = int(parts[2])
     data = await state.get_data()
@@ -1212,14 +1331,13 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
         edit_stack=existing_stack,
     )
     if callback.message:
-        await safe_delete(callback.message)
-        await _send_prompt_text(
+        sent = await _send_prompt_text(
             callback.message,
             state,
             t("promocode.admin.menu_prompt"),
             manage_promocode_actions_keyboard(event_id),
         )
-    await callback.answer()
+        await safe_delete(callback.message)
 
 
 @router.callback_query(F.data == EDIT_EVENT_BACK)
@@ -1233,104 +1351,113 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
             await safe_delete(callback.message)
             await callback.message.answer(t("moderator.settings_title"), reply_markup=moderator_settings_keyboard())
         await state.clear()
-        await callback.answer()
         return
     stack.pop()
     await state.update_data(edit_stack=stack)
     event_id = data.get("edit_event_id")
     if not event_id:
         await state.clear()
-        await callback.answer()
         return
     if not stack:
         services = get_services()
         events = await services.events.get_active_events()
         await state.clear()
         if callback.message:
-            await safe_delete(callback.message)
             if events:
-                await _send_prompt_text(
+                sent = await _send_prompt_text(
                     callback.message,
                     state,
                     t("menu.actual_prompt"),
                     manage_events_keyboard(events),
                 )
                 await state.update_data(edit_stack=[])
+                await safe_delete(callback.message)
             else:
-                await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
-        await callback.answer()
+                new_message = await callback.message.answer(t("moderator.no_events"), reply_markup=moderator_settings_keyboard())
+                await safe_delete(callback.message)
         return
     if callback.message:
         await _clear_notice_message(state, callback.message.bot)
     current = stack[-1] if stack else None
     if current == "fields":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.set_state(EditEventState.selecting_field)
     elif current == "images":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.update_data(new_image_file_ids=[])
         await state.set_state(EditEventState.selecting_field)
     elif current == "promocodes":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("promocode.admin.menu_prompt"),
                 manage_promocode_actions_keyboard(event_id),
             )
-        await state.set_state(EditEventState.selecting_field)
-    elif current == "actions":
-        if callback.message:
             await safe_delete(callback.message)
-            await _send_prompt_text(
+        await state.set_state(EditEventState.selecting_field)
+    elif current == "participants":
+        if callback.message:
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.event_options_prompt"),
                 manage_event_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
+        await state.update_data(edit_stack=["actions"])
+        await state.set_state(EditEventState.selecting_field)
+    elif current == "actions":
+        if callback.message:
+            sent = await _send_prompt_text(
+                callback.message,
+                state,
+                t("edit.event_options_prompt"),
+                manage_event_actions_keyboard(event_id),
+            )
+            await safe_delete(callback.message)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
     elif current == "cancel":
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.event_options_prompt"),
                 manage_event_actions_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
     else:
         if callback.message:
-            await safe_delete(callback.message)
-            await _send_prompt_text(
+            sent = await _send_prompt_text(
                 callback.message,
                 state,
                 t("edit.field_choice_prompt"),
                 edit_field_choice_keyboard(event_id),
             )
+            await safe_delete(callback.message)
         await state.set_state(EditEventState.selecting_field)
-    await callback.answer()
 
 
 @router.message(EditEventState.value_input)
 async def process_edit_value(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     field = data.get("edit_field")
@@ -1350,6 +1477,21 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
         await safe_delete(message)
         return
     services = get_services()
+    if field == "time" and "time" in updates:
+        current_event = await services.events.get_event(event_id)
+        if current_event and current_event.end_time:
+            new_time = updates["time"]
+            if new_time:
+                if new_time > current_event.end_time:
+                    await _send_prompt_text(
+                        message,
+                        state,
+                        t("edit.time_after_period_error"),
+                        edit_step_keyboard(),
+                    )
+                    await safe_delete(message)
+                    return
+                updates["end_time"] = current_event.end_time
     event = await services.events.update_event(event_id, updates)
     if event is None:
         await _send_prompt_text(
@@ -1373,6 +1515,7 @@ async def process_edit_value(message: Message, state: FSMContext) -> None:
 
 @router.message(EditEventState.image_upload)
 async def process_edit_images(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     data = await state.get_data()
     images = list(data.get("new_image_file_ids", []))
     if message.photo:
@@ -1417,7 +1560,7 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
         await _update_prompt_message(
             message,
             state,
-            t("edit.images_cleared", limit=MAX_EVENT_IMAGES, count=0),
+            t("edit.images_cleared"),
             edit_images_keyboard(False, False),
         )
         await safe_delete(message)
@@ -1436,28 +1579,26 @@ async def process_edit_images(message: Message, state: FSMContext) -> None:
 async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext) -> None:
     current_state = await state.get_state()
     if current_state != EditEventState.image_upload.state:
-        await callback.answer()
         return
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
     services = get_services()
     event = await services.events.update_event(event_id, {"image_file_ids": []})
     if event is None:
-        await callback.answer(t("error.save_failed"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.save_failed"), show_alert=True)
         return
     await state.update_data(new_image_file_ids=[], images_dirty=False)
     if callback.message:
         await _update_prompt_message(
             callback.message,
             state,
-            t("edit.images_cleared", limit=MAX_EVENT_IMAGES, count=0),
+            t("edit.images_cleared"),
             edit_images_keyboard(False, False),
         )
-    await callback.answer()
 
 
 @router.callback_query(F.data == EDIT_EVENT_SAVE)
@@ -1466,7 +1607,7 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
     services = get_services()
@@ -1477,7 +1618,7 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
         }
         event = await services.events.update_event(event_id, updates)
         if event is None:
-            await callback.answer(t("error.save_failed"), show_alert=True)
+            await safe_answer_callback(callback, text=t("error.save_failed"), show_alert=True)
             return
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -1488,13 +1629,12 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
             await _send_admin_success_prompt(callback.message, state, admin_notice, event_id)
         await state.update_data(edit_stack=["actions"])
         await state.set_state(EditEventState.selecting_field)
-        await callback.answer()
         return
     if current_state == EditEventState.image_upload.state:
         image_list = list(data.get("new_image_file_ids", []))
         event = await services.events.update_event(event_id, {"image_file_ids": image_list})
         if event is None:
-            await callback.answer(t("error.save_failed"), show_alert=True)
+            await safe_answer_callback(callback, text=t("error.save_failed"), show_alert=True)
             return
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -1516,9 +1656,7 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
             images_dirty=False,
         )
         await state.set_state(EditEventState.selecting_field)
-        await callback.answer()
         return
-    await callback.answer()
 
 
 async def _clear_notice_message(state: FSMContext, bot) -> None:
@@ -1552,8 +1690,8 @@ async def _set_prompt_message(state: FSMContext, message: Message | None) -> Non
 
 
 async def _send_prompt_text(message: Message, state: FSMContext, text: str, reply_markup) -> Message:
-    await _remove_prompt_message(message, state)
     sent = await message.answer(text, reply_markup=reply_markup)
+    await _remove_prompt_message(message, state)
     await _set_prompt_message(state, sent)
     return sent
 
@@ -1583,7 +1721,7 @@ async def _render_create_image_prompt(message: Message, state: FSMContext) -> No
     await _update_prompt_message(
         message,
         state,
-        t("create.image_prompt", limit=MAX_EVENT_IMAGES, count=count),
+        t("create.image_prompt"),
         create_step_keyboard(
             back_enabled=True,
             skip_enabled=True,
@@ -1599,7 +1737,7 @@ async def _render_edit_image_prompt(message: Message, state: FSMContext) -> None
     await _update_prompt_message(
         message,
         state,
-        t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=count),
+            t("edit.prompt_image"),
         edit_images_keyboard(count > 0, dirty),
     )
 
@@ -1701,9 +1839,10 @@ async def _notify_cancellation(callback: CallbackQuery, event: Event) -> None:
     bot = callback.message.bot if callback.message else callback.bot
     telegram_ids = await services.registrations.list_participant_telegram_ids(event.id)
     cancel_text = t("notify.event_cancelled", title=event.title)
+    markup = hide_message_keyboard()
     for telegram_id in telegram_ids:
         try:
-            await bot.send_message(telegram_id, cancel_text)
+            await bot.send_message(telegram_id, cancel_text, reply_markup=markup)
         except Exception:
             continue
 
@@ -1794,7 +1933,6 @@ async def _edit_reminder_markup(callback: CallbackQuery, state: FSMContext) -> N
     selected_1 = data.get("reminder_1day", False)
     prompt_id = data.get(PROMPT_KEY)
     if not prompt_id:
-        await callback.answer()
         return
     if callback.message:
         markup = (
@@ -1807,7 +1945,6 @@ async def _edit_reminder_markup(callback: CallbackQuery, state: FSMContext) -> N
             message_id=prompt_id,
             reply_markup=markup,
         )
-    await callback.answer()
 
 
 async def _send_preview(message: Message, state: FSMContext) -> None:
@@ -1856,6 +1993,7 @@ async def _send_preview(message: Message, state: FSMContext) -> None:
 
 def _build_event_payload(data: dict[str, Any]) -> dict[str, Any]:
     images = tuple(data.get("image_file_ids", []))
+    logger.info(f"[_build_event_payload] Building payload: images_count={len(images)}")
     return {
         "title": data.get("title"),
         "date": data.get("event_date"),
@@ -1955,10 +2093,88 @@ def _edit_prompt_for(field: str) -> str:
         "place": t("edit.prompt_place"),
         "description": t("edit.prompt_description"),
         "cost": t("edit.prompt_cost"),
-        "image": t("edit.prompt_image", limit=MAX_EVENT_IMAGES, count=0),
+        "image": t("edit.prompt_image"),
         "limit": t("edit.prompt_limit"),
     }
     return prompts.get(field, t("edit.prompt_value_fallback"))
+
+
+def _compose_edit_prompt(event: Event | None, field: str) -> str:
+    prompt = _edit_prompt_for(field)
+    current = _current_value_text(field, event)
+    if current:
+        return f"{current}\n\n{prompt}"
+    return prompt
+
+
+def _current_value_text(field: str, event: Event | None) -> str | None:
+    if event is None:
+        return None
+    empty = t("edit.current.empty")
+    if field == "title":
+        return t("edit.current.title", value=event.title or empty)
+    if field == "date":
+        return t("edit.current.date", value=_format_date_value(event))
+    if field == "time":
+        value = _format_time_value(event) or empty
+        return t("edit.current.time", value=value)
+    if field == "period":
+        value = _format_period_value(event) or empty
+        return t("edit.current.period", value=value)
+    if field == "place":
+        return t("edit.current.place", value=event.place or empty)
+    if field == "description":
+        return t("edit.current.description", value=event.description or empty)
+    if field == "cost":
+        return t("edit.current.cost", value=_format_cost_value(event.cost))
+    if field == "limit":
+        return t("edit.current.limit", value=_format_limit_value(event.max_participants))
+    return None
+
+
+def _format_date_value(event: Event) -> str:
+    pattern = t("format.display_date")
+    start = event.date.strftime(pattern)
+    if event.end_date and event.end_date != event.date:
+        end = event.end_date.strftime(pattern)
+        return f"{start} — {end}"
+    return start
+
+
+def _format_time_value(event: Event) -> str | None:
+    pattern = t("format.display_time")
+    if event.time:
+        return event.time.strftime(pattern)
+    if event.end_time:
+        return event.end_time.strftime(pattern)
+    return None
+
+
+def _format_period_value(event: Event) -> str | None:
+    if not event.end_time:
+        return None
+    pattern = t("format.display_time")
+    end = event.end_time.strftime(pattern)
+    if event.time:
+        start = event.time.strftime(pattern)
+        return f"{start} — {end}"
+    return end
+
+
+def _format_cost_value(value: float | None) -> str:
+    if value is None or value <= 0:
+        return t("edit.current.free")
+    decimal_value = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    text = format(decimal_value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
+
+
+def _format_limit_value(value: int | None) -> str:
+    if value is None or value <= 0:
+        return t("edit.current.unlimited")
+    return str(value)
 
 
 def _field_label(field: str) -> str:
@@ -1989,7 +2205,11 @@ def _parse_edit_value(field: str, message: Message) -> dict[str, Any]:
             return {"place": None}
         return {"place": value}
     if field == "description":
-        return {field: (message.text or "").strip() or None}
+        from bot.utils.constants import MAX_DESCRIPTION_LENGTH
+        value = (message.text or "").strip() or None
+        if value and len(value) > MAX_DESCRIPTION_LENGTH:
+            raise ValueError(t("edit.description_too_long"))
+        return {field: value}
     if field == "cost":
         raw_text = (message.text or "").strip()
         if not raw_text or raw_text.lower() in {"пропустить", "skip"}:

@@ -21,6 +21,8 @@ from bot.utils.callbacks import (
     confirm_cancel_event,
     edit_event,
     edit_event_field,
+    event_participants,
+    event_participants_page,
 )
 from bot.utils.i18n import t
 
@@ -107,8 +109,9 @@ def manage_events_keyboard(events, page: int = 0, page_size: int = 5):
 def manage_event_actions_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.settings.edit"), callback_data=edit_event_field(event_id, "menu"))
-    builder.button(text=t("button.settings.broadcast"), callback_data=EDIT_EVENT_BROADCAST)
     builder.button(text=t("button.settings.cancel_event"), callback_data=cancel_event(event_id))
+    builder.button(text=t("button.settings.broadcast"), callback_data=EDIT_EVENT_BROADCAST)
+    builder.button(text=t("button.settings.participants"), callback_data=event_participants(event_id))
     builder.button(text=t("button.settings.promocodes"), callback_data=f"promocode:menu:{event_id}")
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
@@ -208,6 +211,28 @@ def edit_images_keyboard(has_images: bool, dirty: bool):
 def cancel_event_keyboard(event_id: int):
     builder = InlineKeyboardBuilder()
     builder.button(text=t("button.confirm_cancel_event"), callback_data=confirm_cancel_event(event_id))
+    builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def participants_list_keyboard(event_id: int, participants_count: int = 0, page: int = 0, page_size: int = 10):
+    builder = InlineKeyboardBuilder()
+    total_pages = (participants_count + page_size - 1) // page_size if participants_count > 0 else 1
+    
+    if total_pages > 1:
+        prev_page = max(0, page - 1)
+        next_page = min(total_pages - 1, page + 1)
+        pagination_buttons = []
+        if page > 0:
+            pagination_buttons.append(("⏪", event_participants_page(event_id, prev_page)))
+        if page < total_pages - 1:
+            pagination_buttons.append(("⏩", event_participants_page(event_id, next_page)))
+        if pagination_buttons:
+            for text, callback_data in pagination_buttons:
+                builder.button(text=text, callback_data=callback_data)
+            builder.adjust(len(pagination_buttons))
+    
     builder.button(text=t("button.back"), callback_data=EDIT_EVENT_BACK)
     builder.adjust(1)
     return builder.as_markup()

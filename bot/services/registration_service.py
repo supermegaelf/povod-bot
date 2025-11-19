@@ -39,6 +39,9 @@ class RegistrationService:
     async def list_participants(self, event_id: int) -> list[Participant]:
         return await self._repository.list_participants(event_id)
 
+    async def list_paid_participants(self, event_id: int) -> list[Participant]:
+        return await self._repository.list_paid_participants(event_id)
+
     async def remove_participant(self, event_id: int, user_id: int) -> None:
         await self._repository.remove_participant(event_id, user_id)
 

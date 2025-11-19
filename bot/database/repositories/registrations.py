@@ -17,6 +17,8 @@ class Participant:
     user_id: int
     telegram_id: Optional[int]
     username: Optional[str]
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class RegistrationRepository:
@@ -60,6 +62,27 @@ class RegistrationRepository:
                 user_id=row["user_id"],
                 telegram_id=row["telegram_id"],
                 username=row["username"],
+            )
+            for row in rows
+        ]
+
+    async def list_paid_participants(self, event_id: int) -> list[Participant]:
+        query = """
+        SELECT DISTINCT ON (u.id) u.id AS user_id, u.telegram_id, u.username, u.first_name, u.last_name
+        FROM registrations AS r
+        JOIN users AS u ON u.id = r.user_id
+        JOIN payments AS p ON p.event_id = r.event_id AND p.user_id = r.user_id
+        WHERE r.event_id = $1 AND r.status = $2 AND p.status = 'succeeded'
+        ORDER BY u.id, r.registered_at ASC
+        """
+        rows = await self._pool.fetch(query, event_id, STATUS_GOING)
+        return [
+            Participant(
+                user_id=row["user_id"],
+                telegram_id=row["telegram_id"],
+                username=row["username"],
+                first_name=row.get("first_name"),
+                last_name=row.get("last_name"),
             )
             for row in rows
         ]

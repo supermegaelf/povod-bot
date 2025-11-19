@@ -41,13 +41,31 @@ CREATE TABLE IF NOT EXISTS event_images (
 """
 
 ALTER_EVENTS_PLACE_NULL = """
-ALTER TABLE events
-    ALTER COLUMN place DROP NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'events' 
+        AND column_name = 'place' 
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE events ALTER COLUMN place DROP NOT NULL;
+    END IF;
+END $$;
 """
 
 ALTER_EVENTS_TIME_NULL = """
-ALTER TABLE events
-    ALTER COLUMN time DROP NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'events' 
+        AND column_name = 'time' 
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE events ALTER COLUMN time DROP NOT NULL;
+    END IF;
+END $$;
 """
 
 ALTER_EVENTS_ADD_END_DATE = """
@@ -101,17 +119,57 @@ ALTER TABLE payments
     ADD COLUMN IF NOT EXISTS payment_message_id INTEGER;
 """
 
+ALTER_PROMOCODES_UNIQUE_CONSTRAINT = """
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'promocodes_code_key'
+    ) THEN
+        ALTER TABLE promocodes DROP CONSTRAINT promocodes_code_key;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'promocodes_event_id_code_key'
+    ) THEN
+        ALTER TABLE promocodes ADD CONSTRAINT promocodes_event_id_code_key UNIQUE (event_id, code);
+    END IF;
+END $$;
+"""
+
+ALTER_USERS_ADD_FIRST_NAME = """
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS first_name VARCHAR(255);
+"""
+
+ALTER_USERS_ADD_LAST_NAME = """
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS last_name VARCHAR(255);
+"""
+
 CREATE_PROMOCODES = """
 CREATE TABLE IF NOT EXISTS promocodes (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    code VARCHAR(64) NOT NULL UNIQUE,
+    code VARCHAR(64) NOT NULL,
     discount_amount DECIMAL(10, 2) NOT NULL,
     expires_at TIMESTAMP WITHOUT TIME ZONE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     used_by_user_id INTEGER REFERENCES users(id),
     used_at TIMESTAMP WITHOUT TIME ZONE,
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE(event_id, code)
+);
+"""
+
+CREATE_PROMOCODE_USAGES = """
+CREATE TABLE IF NOT EXISTS promocode_usages (
+    id SERIAL PRIMARY KEY,
+    promocode_id INTEGER NOT NULL REFERENCES promocodes(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    used_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE(promocode_id, user_id)
 );
 """
 
@@ -129,5 +187,9 @@ STATEMENTS = (
     CREATE_PAYMENTS,
     ALTER_PAYMENTS_ADD_MESSAGE_ID,
     CREATE_PROMOCODES,
+    ALTER_PROMOCODES_UNIQUE_CONSTRAINT,
+    CREATE_PROMOCODE_USAGES,
+    ALTER_USERS_ADD_FIRST_NAME,
+    ALTER_USERS_ADD_LAST_NAME,
 )
 
