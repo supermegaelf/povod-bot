@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.keyboards import main_menu_keyboard
 from bot.utils.callbacks import START_MAIN_MENU
-from bot.utils.di import get_services
+from bot.utils.di import get_config, get_services
 from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete
 from bot.utils.i18n import t
 
@@ -39,7 +39,8 @@ async def handle_start(message: Message) -> None:
         except Exception:
             pass
     
-    await message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
+    config = get_config()
+    await message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard)
 
 
 @router.callback_query(F.data == START_MAIN_MENU)
@@ -50,11 +51,12 @@ async def open_main_menu(callback: CallbackQuery) -> None:
     raw_name = (tg_user.full_name or tg_user.username or "").strip()
     display_name = escape(raw_name) if raw_name else t("start.fallback_name")
     keyboard = main_menu_keyboard(services.users.is_moderator(user))
+    config = get_config()
     if callback.message:
         try:
-            await callback.message.edit_text(t("menu.title", name=display_name), reply_markup=keyboard)
+            await callback.message.edit_text(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard)
         except Exception:
-            new_message = await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
+            new_message = await callback.message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard)
             await safe_delete(callback.message)
     await safe_answer_callback(callback)
 
