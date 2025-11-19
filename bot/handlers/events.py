@@ -122,9 +122,23 @@ async def show_event(callback: CallbackQuery) -> None:
                             logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
                         if media_messages:
                             _remember_media_group(media_messages[0], media_messages)
-                            buttons_message = await bot.send_message(chat_id, "⬇️", reply_markup=markup)
+                            first_message = media_messages[0]
+                            await asyncio.sleep(0.5)
+                            for attempt in range(5):
+                                try:
+                                    await bot.edit_message_reply_markup(
+                                        chat_id=chat_id,
+                                        message_id=first_message.message_id,
+                                        reply_markup=markup
+                                    )
+                                    break
+                                except Exception as e:
+                                    if attempt < 4:
+                                        await asyncio.sleep(0.5 * (attempt + 1))
+                                        continue
+                                    logger.error(f"[show_event] Failed to add reply_markup to media group after 5 attempts: {e}")
                             if cleanup_start > 0:
-                                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50, exclude_message_id=buttons_message.message_id))
+                                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
                         else:
                             if cleanup_start > 0:
                                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
@@ -458,20 +472,49 @@ async def refund_event(callback: CallbackQuery) -> None:
     
     if callback.message:
         await _cleanup_media_group(callback.message)
+        bot = callback.message.bot
+        chat_id = callback.message.chat.id
         await safe_delete(callback.message)
         images = list(event.image_file_ids)
         if images:
-            if len(images) == 1:
-                await callback.message.answer_photo(images[0], caption=caption_text, reply_markup=markup)
+            valid_images = [file_id for file_id in images if file_id and file_id.strip()]
+            if not valid_images:
+                await bot.send_message(chat_id, text, reply_markup=markup)
+            elif len(valid_images) == 1:
+                await bot.send_photo(chat_id, valid_images[0], caption=caption_text, reply_markup=markup)
             else:
-                media = [InputMediaPhoto(media=file_id) for file_id in images]
-                media[0] = InputMediaPhoto(media=images[0], caption=caption_text)
-                media_messages = await callback.message.answer_media_group(media)
-                if media_messages:
-                    _remember_media_group(media_messages[0], media_messages)
-                    await callback.message.answer("⬇️", reply_markup=markup)
+                try:
+                    media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
+                    media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
+                    media_messages = await asyncio.wait_for(
+                        bot.send_media_group(chat_id, media),
+                        timeout=30.0
+                    )
+                    if media_messages:
+                        _remember_media_group(media_messages[0], media_messages)
+                        first_message = media_messages[0]
+                        await asyncio.sleep(0.5)
+                        for attempt in range(5):
+                            try:
+                                await bot.edit_message_reply_markup(
+                                    chat_id=chat_id,
+                                    message_id=first_message.message_id,
+                                    reply_markup=markup
+                                )
+                                break
+                            except Exception as e:
+                                if attempt < 4:
+                                    await asyncio.sleep(0.5 * (attempt + 1))
+                                    continue
+                                logger.error(f"[refund_event] Failed to add reply_markup to media group after 5 attempts: {e}")
+                except asyncio.TimeoutError:
+                    logger.error(f"[refund_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
+                    await bot.send_message(chat_id, text, reply_markup=markup)
+                except Exception as e:
+                    logger.error(f"[refund_event] Media group send ERROR: {e}", exc_info=True)
+                    await bot.send_message(chat_id, text, reply_markup=markup)
         else:
-            await callback.message.answer(text, reply_markup=markup)
+            await bot.send_message(chat_id, text, reply_markup=markup)
 
 
 def _remember_media_group(anchor: Message, media_messages: list[Message]) -> None:
