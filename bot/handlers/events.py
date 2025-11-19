@@ -84,7 +84,7 @@ async def show_event(callback: CallbackQuery) -> None:
         bot = callback.message.bot
         message_id = callback.message.message_id
         cleanup_start = message_id - 1
-        asyncio.create_task(_cleanup_media_group(callback.message))
+        old_message = callback.message
         images = list(event.image_file_ids)
         if images:
             if len(images) == 1:
@@ -93,17 +93,19 @@ async def show_event(callback: CallbackQuery) -> None:
                         bot.send_photo(chat_id, images[0], caption=caption_text, reply_markup=markup),
                         timeout=10.0
                     )
-                    await safe_delete(callback.message)
+                    await _cleanup_media_group(old_message)
+                    await safe_delete(old_message)
                 except asyncio.TimeoutError:
                     logger.error(f"[show_event] Single photo send TIMEOUT after 10s")
                     new_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                    await safe_delete(callback.message)
+                    await _cleanup_media_group(old_message)
+                    await safe_delete(old_message)
                 except Exception as e:
                     logger.error(f"[show_event] Single photo send ERROR: {e}", exc_info=True)
                     new_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                    await safe_delete(callback.message)
+                    await _cleanup_media_group(old_message)
+                    await safe_delete(old_message)
             else:
-                await safe_delete(callback.message)
                 valid_images = [file_id for file_id in images if file_id and file_id.strip()]
                 if len(valid_images) != len(images):
                     logger.warning(f"[show_event] Invalid file_ids filtered: original={len(images)}, valid={len(valid_images)}")
@@ -113,7 +115,6 @@ async def show_event(callback: CallbackQuery) -> None:
                 else:
                     try:
                         media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
-                        media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
                         media_messages = await asyncio.wait_for(
                             bot.send_media_group(chat_id, media),
                             timeout=30.0
@@ -121,23 +122,10 @@ async def show_event(callback: CallbackQuery) -> None:
                         if len(media_messages) != len(valid_images):
                             logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
                         if media_messages:
-                            _remember_media_group(media_messages[0], media_messages)
-                            first_message = media_messages[0]
-                            logger.info(f"[show_event] Media group sent, first message_id={first_message.message_id}, total messages={len(media_messages)}, markup buttons count={len(markup.inline_keyboard) if markup and markup.inline_keyboard else 0}")
-                            await asyncio.sleep(1.0)
-                            try:
-                                result = await bot.edit_message_reply_markup(
-                                    chat_id=chat_id,
-                                    message_id=first_message.message_id,
-                                    reply_markup=markup
-                                )
-                                logger.info(f"[show_event] Successfully added reply_markup to first message, message_id={first_message.message_id}, result={result}")
-                            except Exception as e:
-                                error_msg = str(e).lower()
-                                if "message is not modified" in error_msg:
-                                    logger.info(f"[show_event] Telegram says markup already exists on message_id={first_message.message_id}, this is OK")
-                                else:
-                                    logger.error(f"[show_event] Failed to add reply_markup to first message, message_id={first_message.message_id}, error: {e}", exc_info=True)
+                            text_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                            _remember_media_group(text_message, media_messages)
+                            await _cleanup_media_group(old_message)
+                            await safe_delete(old_message)
                             if cleanup_start > 0:
                                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
                         else:
@@ -486,29 +474,13 @@ async def refund_event(callback: CallbackQuery) -> None:
             else:
                 try:
                     media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
-                    media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
                     media_messages = await asyncio.wait_for(
                         bot.send_media_group(chat_id, media),
                         timeout=30.0
                     )
                     if media_messages:
-                        _remember_media_group(media_messages[0], media_messages)
-                        first_message = media_messages[0]
-                        logger.info(f"[refund_event] Media group sent, first message_id={first_message.message_id}, total messages={len(media_messages)}, markup buttons count={len(markup.inline_keyboard) if markup and markup.inline_keyboard else 0}")
-                        await asyncio.sleep(1.0)
-                        try:
-                            result = await bot.edit_message_reply_markup(
-                                chat_id=chat_id,
-                                message_id=first_message.message_id,
-                                reply_markup=markup
-                            )
-                            logger.info(f"[refund_event] Successfully added reply_markup to first message, message_id={first_message.message_id}, result={result}")
-                        except Exception as e:
-                            error_msg = str(e).lower()
-                            if "message is not modified" in error_msg:
-                                logger.info(f"[refund_event] Telegram says markup already exists on message_id={first_message.message_id}, this is OK")
-                            else:
-                                logger.error(f"[refund_event] Failed to add reply_markup to first message, message_id={first_message.message_id}, error: {e}", exc_info=True)
+                        text_message = await bot.send_message(chat_id, text, reply_markup=markup)
+                        _remember_media_group(text_message, media_messages)
                 except asyncio.TimeoutError:
                     logger.error(f"[refund_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
                     await bot.send_message(chat_id, text, reply_markup=markup)
