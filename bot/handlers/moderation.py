@@ -1433,9 +1433,6 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
             )
             await safe_delete(callback.message)
         await state.set_state(EditEventState.selecting_field)
-    
-    total_time = (datetime.now() - start_time).total_seconds()
-    logger.info(f"[edit_back] COMPLETED: total_elapsed={total_time:.3f}s")
 
 
 @router.message(EditEventState.value_input)
