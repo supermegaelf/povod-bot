@@ -115,6 +115,7 @@ async def show_event(callback: CallbackQuery) -> None:
                 else:
                     try:
                         media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
+                        media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
                         media_messages = await asyncio.wait_for(
                             bot.send_media_group(chat_id, media),
                             timeout=30.0
@@ -122,8 +123,21 @@ async def show_event(callback: CallbackQuery) -> None:
                         if len(media_messages) != len(valid_images):
                             logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
                         if media_messages:
-                            text_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                            _remember_media_group(text_message, media_messages)
+                            _remember_media_group(media_messages[0], media_messages)
+                            first_message = media_messages[0]
+                            await asyncio.sleep(0.5)
+                            try:
+                                await bot.edit_message_caption(
+                                    chat_id=chat_id,
+                                    message_id=first_message.message_id,
+                                    caption=caption_text,
+                                    reply_markup=markup
+                                )
+                                logger.info(f"[show_event] Successfully added reply_markup to media group, message_id={first_message.message_id}")
+                            except Exception as e:
+                                error_msg = str(e).lower()
+                                if "message is not modified" not in error_msg:
+                                    logger.error(f"[show_event] Failed to add reply_markup to media group, message_id={first_message.message_id}, error: {e}", exc_info=True)
                             await _cleanup_media_group(old_message)
                             await safe_delete(old_message)
                             if cleanup_start > 0:
@@ -474,13 +488,27 @@ async def refund_event(callback: CallbackQuery) -> None:
             else:
                 try:
                     media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
+                    media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
                     media_messages = await asyncio.wait_for(
                         bot.send_media_group(chat_id, media),
                         timeout=30.0
                     )
                     if media_messages:
-                        text_message = await bot.send_message(chat_id, text, reply_markup=markup)
-                        _remember_media_group(text_message, media_messages)
+                        _remember_media_group(media_messages[0], media_messages)
+                        first_message = media_messages[0]
+                        await asyncio.sleep(0.5)
+                        try:
+                            await bot.edit_message_caption(
+                                chat_id=chat_id,
+                                message_id=first_message.message_id,
+                                caption=caption_text,
+                                reply_markup=markup
+                            )
+                            logger.info(f"[refund_event] Successfully added reply_markup to media group, message_id={first_message.message_id}")
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if "message is not modified" not in error_msg:
+                                logger.error(f"[refund_event] Failed to add reply_markup to media group, message_id={first_message.message_id}, error: {e}", exc_info=True)
                 except asyncio.TimeoutError:
                     logger.error(f"[refund_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
                     await bot.send_message(chat_id, text, reply_markup=markup)
