@@ -125,19 +125,38 @@ async def show_event(callback: CallbackQuery) -> None:
                         if media_messages:
                             _remember_media_group(media_messages[0], media_messages)
                             first_message = media_messages[0]
-                            await asyncio.sleep(0.5)
+                            logger.info(f"[show_event] Media group sent, first message_id={first_message.message_id}, caption={first_message.caption[:50] if first_message.caption else 'None'}, has_reply_markup={first_message.reply_markup is not None}")
+                            await asyncio.sleep(1.0)
+                            success = False
                             try:
-                                await bot.edit_message_caption(
+                                result = await bot.edit_message_reply_markup(
                                     chat_id=chat_id,
                                     message_id=first_message.message_id,
-                                    caption=caption_text,
                                     reply_markup=markup
                                 )
-                                logger.info(f"[show_event] Successfully added reply_markup to media group, message_id={first_message.message_id}")
+                                if result and result.reply_markup:
+                                    logger.info(f"[show_event] Successfully added reply_markup via edit_message_reply_markup, message_id={first_message.message_id}")
+                                    success = True
+                                else:
+                                    logger.warning(f"[show_event] edit_message_reply_markup returned without reply_markup, trying edit_message_caption")
                             except Exception as e:
                                 error_msg = str(e).lower()
-                                if "message is not modified" not in error_msg:
-                                    logger.error(f"[show_event] Failed to add reply_markup to media group, message_id={first_message.message_id}, error: {e}", exc_info=True)
+                                logger.warning(f"[show_event] edit_message_reply_markup failed: {e}, trying edit_message_caption")
+                            
+                            if not success:
+                                try:
+                                    result = await bot.edit_message_caption(
+                                        chat_id=chat_id,
+                                        message_id=first_message.message_id,
+                                        caption=caption_text,
+                                        reply_markup=markup
+                                    )
+                                    if result and result.reply_markup:
+                                        logger.info(f"[show_event] Successfully added reply_markup via edit_message_caption, message_id={first_message.message_id}")
+                                    else:
+                                        logger.error(f"[show_event] edit_message_caption returned without reply_markup, message_id={first_message.message_id}")
+                                except Exception as e:
+                                    logger.error(f"[show_event] edit_message_caption also failed, message_id={first_message.message_id}, error: {e}", exc_info=True)
                             await _cleanup_media_group(old_message)
                             await safe_delete(old_message)
                             if cleanup_start > 0:
@@ -496,19 +515,38 @@ async def refund_event(callback: CallbackQuery) -> None:
                     if media_messages:
                         _remember_media_group(media_messages[0], media_messages)
                         first_message = media_messages[0]
-                        await asyncio.sleep(0.5)
+                        logger.info(f"[refund_event] Media group sent, first message_id={first_message.message_id}, caption={first_message.caption[:50] if first_message.caption else 'None'}, has_reply_markup={first_message.reply_markup is not None}")
+                        await asyncio.sleep(1.0)
+                        success = False
                         try:
-                            await bot.edit_message_caption(
+                            result = await bot.edit_message_reply_markup(
                                 chat_id=chat_id,
                                 message_id=first_message.message_id,
-                                caption=caption_text,
                                 reply_markup=markup
                             )
-                            logger.info(f"[refund_event] Successfully added reply_markup to media group, message_id={first_message.message_id}")
+                            if result and result.reply_markup:
+                                logger.info(f"[refund_event] Successfully added reply_markup via edit_message_reply_markup, message_id={first_message.message_id}")
+                                success = True
+                            else:
+                                logger.warning(f"[refund_event] edit_message_reply_markup returned without reply_markup, trying edit_message_caption")
                         except Exception as e:
                             error_msg = str(e).lower()
-                            if "message is not modified" not in error_msg:
-                                logger.error(f"[refund_event] Failed to add reply_markup to media group, message_id={first_message.message_id}, error: {e}", exc_info=True)
+                            logger.warning(f"[refund_event] edit_message_reply_markup failed: {e}, trying edit_message_caption")
+                        
+                        if not success:
+                            try:
+                                result = await bot.edit_message_caption(
+                                    chat_id=chat_id,
+                                    message_id=first_message.message_id,
+                                    caption=caption_text,
+                                    reply_markup=markup
+                                )
+                                if result and result.reply_markup:
+                                    logger.info(f"[refund_event] Successfully added reply_markup via edit_message_caption, message_id={first_message.message_id}")
+                                else:
+                                    logger.error(f"[refund_event] edit_message_caption returned without reply_markup, message_id={first_message.message_id}")
+                            except Exception as e:
+                                logger.error(f"[refund_event] edit_message_caption also failed, message_id={first_message.message_id}, error: {e}", exc_info=True)
                 except asyncio.TimeoutError:
                     logger.error(f"[refund_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
                     await bot.send_message(chat_id, text, reply_markup=markup)
