@@ -1,6 +1,6 @@
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 _LAST_USER_MESSAGES: dict[int, int] = {}
 
@@ -41,6 +41,19 @@ async def safe_delete_by_id(bot: Bot, chat_id: int | None, message_id: int | Non
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except (TelegramBadRequest, TelegramAPIError):
         pass
+    except Exception:
+        pass
+
+
+async def safe_answer_callback(callback: CallbackQuery, text: str | None = None, show_alert: bool = False) -> None:
+    try:
+        await callback.answer(text=text, show_alert=show_alert)
+    except TelegramBadRequest as e:
+        error_message = str(e).lower()
+        if "too old" in error_message or "timeout expired" in error_message or "query id is invalid" in error_message:
+            pass
+        else:
+            raise
     except Exception:
         pass
 

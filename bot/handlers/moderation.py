@@ -64,7 +64,7 @@ from bot.utils.callbacks import (
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.constants import MAX_EVENT_IMAGES
-from bot.utils.messaging import remember_user_message, safe_delete, safe_delete_message, safe_delete_by_id
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_message, safe_delete_by_id
 from bot.utils.i18n import t
 
 router = Router()
@@ -652,7 +652,7 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     if not services.users.is_moderator(user):
-        await callback.answer(t("common.no_permissions"), show_alert=True)
+        await safe_answer_callback(callback, text=t("common.no_permissions"), show_alert=True)
         return
     page = int(callback.data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
     events = await services.events.get_active_events(limit=20)
@@ -706,7 +706,7 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
     if field == "image":
         event = await services.events.get_event(event_id)
         if event is None:
-            await callback.answer(t("error.event_not_found"), show_alert=True)
+            await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
             return
         existing_images = list(event.image_file_ids)
         await _push_edit_stack(state, "images")
@@ -718,7 +718,7 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         return
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     await _push_edit_stack(state, "value")
     await state.set_state(EditEventState.value_input)
@@ -738,7 +738,7 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
     await _push_edit_stack(state, "broadcast")
@@ -869,7 +869,7 @@ async def cancel_event_confirm(callback: CallbackQuery, state: FSMContext) -> No
     services = get_services()
     event = await services.events.cancel_event(event_id)
     if event is None:
-        await callback.answer(t("error.cancel_failed"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.cancel_failed"), show_alert=True)
         return
     await _notify_cancellation(callback, event)
     await state.clear()
@@ -903,7 +903,7 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
     services = get_services()
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     participants = await services.registrations.list_paid_participants(event_id)
     if callback.message:
@@ -961,7 +961,7 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
     services = get_services()
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     await state.clear()
     await state.set_state(EditEventState.selecting_field)
@@ -1031,7 +1031,7 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
     event_id = int(payload[2])
     event = await services.events.get_event(event_id)
     if event is None:
-        await callback.answer(t("error.event_not_found"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     data = await state.get_data()
     existing_stack = list(data.get("edit_stack", []))
@@ -1566,13 +1566,13 @@ async def clear_edit_images_callback(callback: CallbackQuery, state: FSMContext)
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
     services = get_services()
     event = await services.events.update_event(event_id, {"image_file_ids": []})
     if event is None:
-        await callback.answer(t("error.save_failed"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.save_failed"), show_alert=True)
         return
     await state.update_data(new_image_file_ids=[], images_dirty=False)
     if callback.message:
@@ -1590,7 +1590,7 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     event_id = data.get("edit_event_id")
     if not event_id:
-        await callback.answer(t("error.context_lost_alert"), show_alert=True)
+        await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
     services = get_services()
@@ -1601,7 +1601,7 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
         }
         event = await services.events.update_event(event_id, updates)
         if event is None:
-            await callback.answer(t("error.save_failed"), show_alert=True)
+            await safe_answer_callback(callback, text=t("error.save_failed"), show_alert=True)
             return
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -1617,7 +1617,7 @@ async def handle_edit_save(callback: CallbackQuery, state: FSMContext) -> None:
         image_list = list(data.get("new_image_file_ids", []))
         event = await services.events.update_event(event_id, {"image_file_ids": image_list})
         if event is None:
-            await callback.answer(t("error.save_failed"), show_alert=True)
+            await safe_answer_callback(callback, text=t("error.save_failed"), show_alert=True)
             return
         if callback.message:
             await _remove_prompt_message(callback.message, state)

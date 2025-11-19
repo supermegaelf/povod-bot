@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.keyboards import main_menu_keyboard
 from bot.utils.callbacks import START_MAIN_MENU
 from bot.utils.di import get_services
-from bot.utils.messaging import remember_user_message, safe_delete
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete
 from bot.utils.i18n import t
 
 router = Router()
@@ -56,7 +56,7 @@ async def open_main_menu(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("menu.title", name=display_name), reply_markup=keyboard)
             await safe_delete(callback.message)
-    await callback.answer()
+    await safe_answer_callback(callback)
 
 
 
