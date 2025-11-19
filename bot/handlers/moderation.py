@@ -723,8 +723,18 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(EditEventState.image_upload)
         await state.update_data(edit_field=field, new_image_file_ids=existing_images, images_dirty=False)
         if callback.message:
-            await _render_edit_image_prompt(callback.message, state)
+            from bot.handlers.events import _cleanup_media_group
+            await _cleanup_media_group(callback.message)
+            chat_id = callback.message.chat.id
+            bot = callback.message.bot
             await safe_delete(callback.message)
+            sent = await bot.send_message(
+                chat_id,
+                t("edit.prompt_image"),
+                reply_markup=edit_images_keyboard(len(existing_images) > 0, False),
+            )
+            await _set_prompt_message(state, sent)
+        await safe_answer_callback(callback)
         return
     event = await services.events.get_event(event_id)
     if event is None:
