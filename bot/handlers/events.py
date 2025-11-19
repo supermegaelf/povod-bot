@@ -146,11 +146,17 @@ async def back_to_list(callback: CallbackQuery) -> None:
     if not events:
         if callback.message:
             await _cleanup_media_group(callback.message)
-            new_message = await callback.message.answer(
-                t("menu.actual_empty"),
-                reply_markup=back_to_main_keyboard(),
-            )
-            await safe_delete(callback.message)
+            try:
+                await callback.message.edit_text(
+                    t("menu.actual_empty"),
+                    reply_markup=back_to_main_keyboard(),
+                )
+            except Exception:
+                new_message = await callback.message.answer(
+                    t("menu.actual_empty"),
+                    reply_markup=back_to_main_keyboard(),
+                )
+                await safe_delete(callback.message)
         await callback.answer()
         return
     if callback.message:
