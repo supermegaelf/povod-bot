@@ -76,6 +76,9 @@ async def show_event(callback: CallbackQuery) -> None:
     text = format_event_card(event, availability, discount if discount > 0 else None)
     markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
     
+    MAX_CAPTION_LENGTH = 1024
+    caption_text = text[:MAX_CAPTION_LENGTH] if len(text) > MAX_CAPTION_LENGTH else text
+    
     if callback.message:
         chat_id = callback.message.chat.id
         bot = callback.message.bot
@@ -87,7 +90,7 @@ async def show_event(callback: CallbackQuery) -> None:
             if len(images) == 1:
                 try:
                     new_message = await asyncio.wait_for(
-                        bot.send_photo(chat_id, images[0], caption=text, reply_markup=markup),
+                        bot.send_photo(chat_id, images[0], caption=caption_text, reply_markup=markup),
                         timeout=10.0
                     )
                     await safe_delete(callback.message)
@@ -111,7 +114,7 @@ async def show_event(callback: CallbackQuery) -> None:
                     async def _send_media_group_task():
                         try:
                             media = [InputMediaPhoto(media=file_id) for file_id in valid_images]
-                            media[0] = InputMediaPhoto(media=valid_images[0], caption=text)
+                            media[0] = InputMediaPhoto(media=valid_images[0], caption=caption_text)
                             media_messages = await asyncio.wait_for(
                                 bot.send_media_group(chat_id, media),
                                 timeout=30.0
@@ -447,16 +450,19 @@ async def refund_event(callback: CallbackQuery) -> None:
     text = format_event_card(event, availability, discount if discount > 0 else None)
     markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
     
+    MAX_CAPTION_LENGTH = 1024
+    caption_text = text[:MAX_CAPTION_LENGTH] if len(text) > MAX_CAPTION_LENGTH else text
+    
     if callback.message:
         await _cleanup_media_group(callback.message)
         await safe_delete(callback.message)
         images = list(event.image_file_ids)
         if images:
             if len(images) == 1:
-                await callback.message.answer_photo(images[0], caption=text, reply_markup=markup)
+                await callback.message.answer_photo(images[0], caption=caption_text, reply_markup=markup)
             else:
                 media = [InputMediaPhoto(media=file_id) for file_id in images]
-                media[0] = InputMediaPhoto(media=images[0], caption=text)
+                media[0] = InputMediaPhoto(media=images[0], caption=caption_text)
                 media_messages = await callback.message.answer_media_group(media)
                 if media_messages:
                     last_message = media_messages[-1]
