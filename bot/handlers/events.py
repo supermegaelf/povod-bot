@@ -477,7 +477,6 @@ async def refund_event(callback: CallbackQuery) -> None:
     if is_paid_event:
         payment = await services.payments.get_successful_payment(event.id, user.id)
         if payment:
-            await callback.answer("")
             refund_success = await services.payments.refund_payment(payment.payment_id, payment.amount)
             if not refund_success:
                 await callback.answer(t("event.refund.payment_failed"), show_alert=True)
