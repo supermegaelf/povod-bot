@@ -122,30 +122,22 @@ async def show_event(callback: CallbackQuery) -> None:
                             logger.warning(f"[show_event] Media group count mismatch: expected {len(valid_images)}, got {len(media_messages)}")
                         if media_messages:
                             _remember_media_group(media_messages[0], media_messages)
-                            target_message = media_messages[-1]
-                            logger.info(f"[show_event] Media group sent, last message_id={target_message.message_id}, markup buttons count={len(markup.inline_keyboard) if markup and markup.inline_keyboard else 0}")
-                            await asyncio.sleep(0.5)
+                            first_message = media_messages[0]
+                            logger.info(f"[show_event] Media group sent, first message_id={first_message.message_id}, total messages={len(media_messages)}, markup buttons count={len(markup.inline_keyboard) if markup and markup.inline_keyboard else 0}")
+                            await asyncio.sleep(1.0)
                             try:
-                                await bot.edit_message_reply_markup(
+                                result = await bot.edit_message_reply_markup(
                                     chat_id=chat_id,
-                                    message_id=target_message.message_id,
+                                    message_id=first_message.message_id,
                                     reply_markup=markup
                                 )
-                                logger.info(f"[show_event] Successfully added reply_markup to last message of media group, message_id={target_message.message_id}")
+                                logger.info(f"[show_event] Successfully added reply_markup to first message, message_id={first_message.message_id}, result={result}")
                             except Exception as e:
                                 error_msg = str(e).lower()
-                                logger.warning(f"[show_event] Failed to add reply_markup to last message, trying first message: {e}")
-                                first_message = media_messages[0]
-                                try:
-                                    await bot.edit_message_caption(
-                                        chat_id=chat_id,
-                                        message_id=first_message.message_id,
-                                        caption=caption_text,
-                                        reply_markup=markup
-                                    )
-                                    logger.info(f"[show_event] Successfully added reply_markup via edit_message_caption to first message, message_id={first_message.message_id}")
-                                except Exception as e2:
-                                    logger.error(f"[show_event] Both attempts failed. Last message_id={target_message.message_id}, first message_id={first_message.message_id}, error: {e2}", exc_info=True)
+                                if "message is not modified" in error_msg:
+                                    logger.info(f"[show_event] Telegram says markup already exists on message_id={first_message.message_id}, this is OK")
+                                else:
+                                    logger.error(f"[show_event] Failed to add reply_markup to first message, message_id={first_message.message_id}, error: {e}", exc_info=True)
                             if cleanup_start > 0:
                                 asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
                         else:
@@ -502,34 +494,21 @@ async def refund_event(callback: CallbackQuery) -> None:
                     if media_messages:
                         _remember_media_group(media_messages[0], media_messages)
                         first_message = media_messages[0]
-                        await asyncio.sleep(0.5)
+                        logger.info(f"[refund_event] Media group sent, first message_id={first_message.message_id}, total messages={len(media_messages)}, markup buttons count={len(markup.inline_keyboard) if markup and markup.inline_keyboard else 0}")
+                        await asyncio.sleep(1.0)
                         try:
-                            await bot.edit_message_caption(
+                            result = await bot.edit_message_reply_markup(
                                 chat_id=chat_id,
                                 message_id=first_message.message_id,
-                                caption=caption_text,
                                 reply_markup=markup
                             )
-                            logger.info(f"[refund_event] Successfully added reply_markup via edit_message_caption, message_id={first_message.message_id}")
+                            logger.info(f"[refund_event] Successfully added reply_markup to first message, message_id={first_message.message_id}, result={result}")
                         except Exception as e:
                             error_msg = str(e).lower()
                             if "message is not modified" in error_msg:
-                                logger.info(f"[refund_event] Reply markup already exists on message_id={first_message.message_id}")
+                                logger.info(f"[refund_event] Telegram says markup already exists on message_id={first_message.message_id}, this is OK")
                             else:
-                                logger.warning(f"[refund_event] edit_message_caption failed, trying edit_message_reply_markup: {e}")
-                                try:
-                                    await bot.edit_message_reply_markup(
-                                        chat_id=chat_id,
-                                        message_id=first_message.message_id,
-                                        reply_markup=markup
-                                    )
-                                    logger.info(f"[refund_event] Successfully added reply_markup via edit_message_reply_markup, message_id={first_message.message_id}")
-                                except Exception as e2:
-                                    error_msg2 = str(e2).lower()
-                                    if "message is not modified" in error_msg2:
-                                        logger.info(f"[refund_event] Reply markup already exists on message_id={first_message.message_id}")
-                                    else:
-                                        logger.error(f"[refund_event] Failed to add reply_markup to media group, message_id={first_message.message_id}, error: {e2}", exc_info=True)
+                                logger.error(f"[refund_event] Failed to add reply_markup to first message, message_id={first_message.message_id}, error: {e}", exc_info=True)
                 except asyncio.TimeoutError:
                     logger.error(f"[refund_event] Media group send TIMEOUT after 30s: {len(valid_images)} images")
                     await bot.send_message(chat_id, text, reply_markup=markup)
