@@ -58,7 +58,7 @@ async def safe_answer_callback(callback: CallbackQuery, text: str | None = None,
         pass
 
 
-async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_id: int, count: int = 100) -> None:
+async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_id: int, count: int = 100, exclude_message_id: int | None = None) -> None:
     deleted_count = 0
     failed_count = 0
     max_failed = 10
@@ -69,6 +69,8 @@ async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_
         if message_id <= 0:
             break
         if last_user_message_id and message_id == last_user_message_id:
+            continue
+        if exclude_message_id and message_id == exclude_message_id:
             continue
         try:
             await bot.delete_message(chat_id, message_id)
