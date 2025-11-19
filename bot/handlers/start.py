@@ -12,7 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.keyboards import main_menu_keyboard
 from bot.utils.callbacks import START_MAIN_MENU
 from bot.utils.di import get_services
-from bot.utils.messaging import safe_delete
+from bot.utils.messaging import remember_user_message, safe_delete
 from bot.utils.i18n import t
 
 router = Router()
@@ -20,6 +20,7 @@ router = Router()
 
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
+    remember_user_message(message)
     services = get_services()
     tg_user = message.from_user
     if tg_user is None:
@@ -67,6 +68,7 @@ async def open_main_menu(callback: CallbackQuery) -> None:
             await safe_delete(callback.message)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[open_main_menu] COMPLETED: total_elapsed={total_time:.3f}s")
+    await callback.answer()
 
 
 

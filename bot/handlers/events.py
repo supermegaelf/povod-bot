@@ -29,7 +29,7 @@ from bot.utils.callbacks import (
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.i18n import t
-from bot.utils.messaging import safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
+from bot.utils.messaging import remember_user_message, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
 from bot.keyboards.event_card import promocode_back_keyboard
 
 router = Router()
@@ -164,6 +164,7 @@ async def show_event(callback: CallbackQuery) -> None:
         logger.info(f"[show_event] Message sent: elapsed={send_time:.3f}s")
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[show_event] COMPLETED: total_elapsed={total_time:.3f}s")
+    await callback.answer()
 
 
 @router.callback_query(F.data == EVENT_BACK_TO_LIST)
@@ -189,6 +190,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
                 reply_markup=back_to_main_keyboard(),
             )
             await safe_delete(callback.message)
+        await callback.answer()
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
@@ -200,6 +202,7 @@ async def back_to_list(callback: CallbackQuery) -> None:
             await safe_delete(callback.message)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[back_to_list] COMPLETED: total_elapsed={total_time:.3f}s")
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_LIST_PAGE_PREFIX))
@@ -227,6 +230,7 @@ async def event_list_page(callback: CallbackQuery) -> None:
                     reply_markup=back_to_main_keyboard(),
                 )
                 await safe_delete(callback.message)
+        await callback.answer()
         return
     if callback.message:
         await _cleanup_media_group(callback.message)
@@ -236,6 +240,7 @@ async def event_list_page(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
             await safe_delete(callback.message)
+    await callback.answer()
 
 
 @router.callback_query(
@@ -262,6 +267,7 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(text, reply_markup=markup)
             await safe_delete(callback.message)
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_PAYMENT_METHOD_PREFIX))
@@ -348,6 +354,7 @@ async def process_payment(callback: CallbackQuery) -> None:
     
     total_time = (datetime.now() - start_time).total_seconds()
     logger.info(f"[process_payment] COMPLETED: elapsed={total_time:.3f}s")
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith(EVENT_PROMOCODE_PREFIX))
@@ -386,10 +393,12 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
                 reply_markup=promocode_back_keyboard(event.id),
             )
             await safe_delete(callback.message)
+    await callback.answer()
 
 
 @router.message(PromocodeState.code)
 async def process_promocode(message: Message, state: FSMContext) -> None:
+    remember_user_message(message)
     current_state = await state.get_state()
     if current_state != PromocodeState.code.state:
         return

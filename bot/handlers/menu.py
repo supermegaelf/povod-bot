@@ -37,6 +37,7 @@ async def show_actual_events(callback: CallbackQuery) -> None:
             except Exception:
                 new_message = await callback.message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
                 await safe_delete(callback.message)
+        await callback.answer()
         return
     if callback.message:
         keyboard = event_list_keyboard(events)
@@ -67,6 +68,7 @@ async def show_actual_events(callback: CallbackQuery) -> None:
                 await safe_delete(callback.message)
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info(f"[show_actual_events] COMPLETED: total_elapsed={total_time:.3f}s")
+    await callback.answer()
 
 
 @router.callback_query(F.data == MENU_COMMUNITY)
@@ -100,6 +102,7 @@ async def show_community(callback: CallbackQuery) -> None:
                 disable_web_page_preview=True,
             )
             await safe_delete(callback.message)
+    await callback.answer()
 
 
 @router.callback_query(F.data == MENU_SETTINGS)
@@ -120,4 +123,5 @@ async def show_settings(callback: CallbackQuery) -> None:
         except Exception:
             new_message = await callback.message.answer(t("moderator.settings_title"), reply_markup=keyboard)
             await safe_delete(callback.message)
+    await callback.answer()
 
