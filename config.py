@@ -29,6 +29,7 @@ class CommunityLinks:
 @dataclass(frozen=True)
 class SupportLinks:
     question_url: str
+    about_us_url: str
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ def load_config() -> Config:
     )
     support = SupportLinks(
         question_url=_require_env("EVENT_QUESTION_URL"),
+        about_us_url=_require_env("ABOUT_US_URL"),
     )
     reminders = ReminderConfig(
         rule_3=_parse_reminder_rule(prefix="3", default_days=3),

@@ -117,7 +117,7 @@ class MessageRefreshMiddleware(BaseMiddleware):
         if not data:
             return False
         
-        from bot.utils.di import get_services
+        from bot.utils.di import get_config, get_services
         from bot.keyboards import (
             event_card_keyboard,
             event_list_keyboard,
@@ -257,7 +257,8 @@ class MessageRefreshMiddleware(BaseMiddleware):
             raw_name = (callback.from_user.full_name or callback.from_user.username or "").strip() if callback.from_user else ""
             from html import escape
             display_name = escape(raw_name) if raw_name else t("start.fallback_name")
-            text = t("menu.title", name=display_name)
+            config = get_config()
+            text = t("menu.title", name=display_name, about_us_url=config.support.about_us_url)
             await callback.message.edit_text(text, reply_markup=markup)
             return True
         
