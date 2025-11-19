@@ -40,7 +40,7 @@ async def handle_start(message: Message) -> None:
             pass
     
     config = get_config()
-    await message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard)
+    await message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard, disable_web_page_preview=True)
 
 
 @router.callback_query(F.data == START_MAIN_MENU)
@@ -54,9 +54,9 @@ async def open_main_menu(callback: CallbackQuery) -> None:
     config = get_config()
     if callback.message:
         try:
-            await callback.message.edit_text(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard)
+            await callback.message.edit_text(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard, disable_web_page_preview=True)
         except Exception:
-            new_message = await callback.message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard)
+            new_message = await callback.message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard, disable_web_page_preview=True)
             await safe_delete(callback.message)
     await safe_answer_callback(callback)
 
