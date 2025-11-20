@@ -2,7 +2,6 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
-UTC_TZ = ZoneInfo("UTC")
 
 
 def get_event_start(event) -> datetime:
