@@ -37,6 +37,12 @@ router = Router()
 _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
 
 
+def _event_has_started(event) -> bool:
+    event_time = event.time or time(0, 0)
+    event_start = datetime.combine(event.date, event_time)
+    return datetime.now() >= event_start
+
+
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
 async def show_event(callback: CallbackQuery) -> None:
     services = get_services()
@@ -193,6 +199,10 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
     if event is None:
         return
 
+    if _event_has_started(event):
+        await safe_answer_callback(callback, text=t("payment.event_started"), show_alert=True)
+        return
+
     text = t("payment.method_prompt")
     markup = payment_method_keyboard(event_id)
 
@@ -222,6 +232,10 @@ async def process_payment(callback: CallbackQuery) -> None:
     event = await services.events.get_event(event_id)
     if event is None:
         await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
+        return
+
+    if _event_has_started(event):
+        await safe_answer_callback(callback, text=t("payment.event_started"), show_alert=True)
         return
 
     tg_user = callback.from_user
