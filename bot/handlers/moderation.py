@@ -1079,16 +1079,15 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
             else:
                 event_start_str = event_date_str
             lines = []
-            for p in promocodes:
-                lines.append(
-                    t(
-                        "promocode.admin.list_item",
-                        code=p.code,
-                        discount=f"{p.discount_amount:.0f}",
-                        event_start=event_start_str,
-                    )
+            for idx, p in enumerate(promocodes, start=1):
+                item_text = t(
+                    "promocode.admin.list_item",
+                    code=p.code,
+                    discount=f"{p.discount_amount:.0f}",
+                    event_start=event_start_str,
                 )
-            text = "\n".join(lines)
+                lines.append(f"{idx}. {item_text}")
+            text = "\n\n".join(lines)
             await _send_prompt_text(
                 callback.message,
                 state,
