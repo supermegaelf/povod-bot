@@ -111,8 +111,8 @@ async def show_event(callback: CallbackQuery) -> None:
                 logger.warning(f"[show_event] Edit failed: {e}, sending new then deleting old")
                 new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
-            if cleanup_start > 0:
-                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
+        if cleanup_start > 0:
+            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
     await safe_answer_callback(callback)
 
 
