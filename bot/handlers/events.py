@@ -1,7 +1,5 @@
 import asyncio
 import logging
-from datetime import datetime, time
-
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -28,6 +26,7 @@ from bot.utils.callbacks import (
 )
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
+from bot.utils.events import has_event_started
 from bot.utils.i18n import t
 from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
 from bot.keyboards.event_card import promocode_back_keyboard
@@ -35,12 +34,6 @@ from bot.keyboards.event_card import promocode_back_keyboard
 router = Router()
 
 _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
-
-
-def _event_has_started(event) -> bool:
-    event_time = event.time or time(0, 0)
-    event_start = datetime.combine(event.date, event_time)
-    return datetime.now() >= event_start
 
 
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
@@ -80,7 +73,14 @@ async def show_event(callback: CallbackQuery) -> None:
         stats = type('Stats', (), {'going': 0})()
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability, discount if discount > 0 else None)
-    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
+    event_started = has_event_started(event)
+    markup = event_card_keyboard(
+        event.id,
+        is_paid=is_paid,
+        is_paid_event=is_paid_event,
+        is_registered=is_registered,
+        allow_payment=not event_started,
+    )
     
     MAX_CAPTION_LENGTH = 1024
     caption_text = text[:MAX_CAPTION_LENGTH] if len(text) > MAX_CAPTION_LENGTH else text
@@ -199,7 +199,7 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
     if event is None:
         return
 
-    if _event_has_started(event):
+    if has_event_started(event):
         await safe_answer_callback(callback, text=t("payment.event_started"), show_alert=True)
         return
 
@@ -234,7 +234,7 @@ async def process_payment(callback: CallbackQuery) -> None:
         await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
 
-    if _event_has_started(event):
+    if has_event_started(event):
         await safe_answer_callback(callback, text=t("payment.event_started"), show_alert=True)
         return
 
@@ -344,9 +344,7 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
         await message.answer(t("error.event_not_found"))
         return
 
-    event_time = event.time or time(0, 0)
-    event_start = datetime.combine(event.date, event_time)
-    if datetime.now() >= event_start:
+    if has_event_started(event):
         await state.clear()
         await message.answer(t("promocode.error.expired"), reply_markup=promocode_back_keyboard(event_id))
         return
@@ -428,8 +426,15 @@ async def refund_event(callback: CallbackQuery) -> None:
     
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
+    event_started = has_event_started(event)
     text = format_event_card(event, availability, discount if discount > 0 else None)
-    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
+    markup = event_card_keyboard(
+        event.id,
+        is_paid=is_paid,
+        is_paid_event=is_paid_event,
+        is_registered=is_registered,
+        allow_payment=not event_started,
+    )
     
     MAX_CAPTION_LENGTH = 1024
     caption_text = text[:MAX_CAPTION_LENGTH] if len(text) > MAX_CAPTION_LENGTH else text
