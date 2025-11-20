@@ -45,10 +45,16 @@ def event_list_keyboard(events, page: int = 0, page_size: int = 5):
     return builder.as_markup()
 
 
-def event_card_keyboard(event_id: int, is_paid: bool = False, is_paid_event: bool = True, is_registered: bool = False):
+def event_card_keyboard(
+    event_id: int,
+    is_paid: bool = False,
+    is_paid_event: bool = True,
+    is_registered: bool = False,
+    allow_payment: bool = True,
+):
     builder = InlineKeyboardBuilder()
     config = get_config()
-    if is_paid_event and not is_paid:
+    if is_paid_event and not is_paid and allow_payment:
         builder.button(text=t("button.event.pay"), callback_data=event_payment(event_id))
         builder.button(text=t("button.event.promocode"), callback_data=event_promocode(event_id))
     if is_registered:

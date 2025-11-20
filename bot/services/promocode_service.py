@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from datetime import datetime, time, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from bot.database.pool import get_pool
 from bot.database.repositories.promocodes import PromocodeRepository
 from bot.services.event_service import EventService
+from bot.utils.events import get_event_start, now_moscow
 
 
 @dataclass(frozen=True)
@@ -32,8 +33,8 @@ class PromocodeService:
         if event is None:
             return PromocodeResult(success=False, error_code="not_found")
 
-        event_start = datetime.combine(event.date, event.time or time.min).replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+        event_start = get_event_start(event)
+        now = now_moscow()
         if now >= event_start:
             return PromocodeResult(success=False, error_code="expired")
 
@@ -41,7 +42,8 @@ class PromocodeService:
             return PromocodeResult(success=False, error_code="already_used")
 
         try:
-            await self._repository.mark_used(promocode.id, user_id, now.replace(tzinfo=None))
+            stored_time = now.astimezone(timezone.utc).replace(tzinfo=None)
+            await self._repository.mark_used(promocode.id, user_id, stored_time)
             if await self._repository.is_used_by_user(promocode.id, user_id):
                 return PromocodeResult(success=True, discount=promocode.discount_amount)
             return PromocodeResult(success=False, error_code="already_used")
