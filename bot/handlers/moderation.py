@@ -1166,16 +1166,20 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
         )
         normalized_code = code.strip().upper()
         if deleted:
-            await message.answer(
+            await _send_prompt_text(
+                message,
+                state,
                 t("promocode.admin.delete_success", code=normalized_code),
-                reply_markup=manage_promocode_actions_keyboard(event_id),
+                manage_promocode_actions_keyboard(event_id),
             )
         else:
             await state.set_state(PromocodeAdminState.code_input)
             await state.update_data(promocode_event_id=event_id, promocode_delete_mode=True)
-            await message.answer(
+            await _send_prompt_text(
+                message,
+                state,
                 t("promocode.admin.delete_not_found"),
-                reply_markup=promocode_input_keyboard(event_id),
+                promocode_input_keyboard(event_id),
             )
         return
     await state.update_data(promocode_code=code)
@@ -1257,9 +1261,11 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         edit_stack=existing_stack,
     )
     normalized_code = code.strip().upper()
-    await message.answer(
+    await _send_prompt_text(
+        message,
+        state,
         t("promocode.admin.add_success", code=normalized_code, discount=f"{value:.0f}"),
-        reply_markup=manage_promocode_actions_keyboard(event_id),
+        manage_promocode_actions_keyboard(event_id),
     )
 
 
