@@ -142,7 +142,7 @@
   "event.refund.not_registered": "Вы не зарегистрированы на это мероприятие ⛔️",
   "event.refund.payment_failed": "Не удалось оформить возврат средств. Пожалуйста, обратитесь в поддержку.",
   "event.refund.success": "Вы успешно отменили запись ✅",
-  "event.refund.success_with_payment": "Запись успешно отменена ✅\nСредства вернутся в течение нескольких рабочих дней.",
+  "event.refund.success_with_payment": "Запись успешно отменена ✅ Средства вернутся в течение нескольких рабочих дней.",
   "format.display_date": "%d.%m.%Y",
   "format.display_time": "%H:%M",
   "format.input_date": "%d.%m.%Y",
