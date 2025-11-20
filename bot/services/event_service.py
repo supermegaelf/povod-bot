@@ -2,14 +2,18 @@ from typing import Sequence
 
 from bot.database.pool import get_pool
 from bot.database.repositories.events import Event, EventRepository
+from bot.utils.events import has_event_started
 
 
 class EventService:
     def __init__(self, repository: EventRepository) -> None:
         self._repository = repository
 
-    async def get_active_events(self, limit: int | None = None) -> Sequence[Event]:
-        return await self._repository.list_active(limit)
+    async def get_active_events(self, limit: int | None = None, include_started: bool = False) -> Sequence[Event]:
+        events = await self._repository.list_active(limit)
+        if include_started:
+            return events
+        return [event for event in events if not has_event_started(event)]
 
     async def get_event(self, event_id: int) -> Event | None:
         return await self._repository.get(event_id)

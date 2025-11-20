@@ -229,7 +229,7 @@ class MessageRefreshMiddleware(BaseMiddleware):
         
         elif data.startswith(MANAGE_EVENTS_PAGE_PREFIX):
             page = int(data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
-            events = await services.events.get_active_events(limit=20)
+            events = await services.events.get_active_events(limit=20, include_started=True)
             if events:
                 markup = manage_events_keyboard(events, page=page)
                 text = t("menu.actual_prompt")

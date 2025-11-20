@@ -632,7 +632,7 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
     if not services.users.is_moderator(user):
         return
     await state.clear()
-    events = await services.events.get_active_events(limit=20)
+    events = await services.events.get_active_events(limit=20, include_started=True)
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -665,7 +665,7 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
         await safe_answer_callback(callback, text=t("common.no_permissions"), show_alert=True)
         return
     page = int(callback.data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
-    events = await services.events.get_active_events(limit=20)
+    events = await services.events.get_active_events(limit=20, include_started=True)
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -1360,7 +1360,7 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
         return
     if not stack:
         services = get_services()
-        events = await services.events.get_active_events()
+        events = await services.events.get_active_events(include_started=True)
         await state.clear()
         if callback.message:
             if events:
