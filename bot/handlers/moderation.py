@@ -694,6 +694,7 @@ async def handle_edit_entry(callback: CallbackQuery, state: FSMContext) -> None:
     event_id, field = extract_event_id_and_field(callback.data, EDIT_EVENT_FIELD_PREFIX)
     await _ensure_event_context(state, event_id)
     if field == "menu":
+        await safe_answer_callback(callback)
         await _push_edit_stack(state, "fields")
         await state.set_state(EditEventState.selecting_field)
         if callback.message:
@@ -761,6 +762,7 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext) -> None:
         await safe_answer_callback(callback, text=t("error.context_lost_alert"), show_alert=True)
         await state.clear()
         return
+    await safe_answer_callback(callback)
     await _push_edit_stack(state, "broadcast")
     await state.set_state(EditEventState.broadcast)
     if callback.message:
@@ -926,6 +928,7 @@ async def _render_participants_list(callback: CallbackQuery, state: FSMContext, 
         await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
         return
     participants = await services.registrations.list_paid_participants(event_id)
+    await safe_answer_callback(callback)
     if callback.message:
         await _push_edit_stack(state, "participants")
         await state.update_data(edit_event_id=event_id, edit_stack=["actions", "participants"])
@@ -989,6 +992,7 @@ async def open_event_actions(callback: CallbackQuery, state: FSMContext) -> None
         edit_event_id=event_id,
         edit_stack=["actions"],
     )
+    await safe_answer_callback(callback)
     if callback.message:
         await _clear_notice_message(state, callback.message.bot)
         await _remove_prompt_message(callback.message, state)
@@ -1347,6 +1351,7 @@ async def promocode_back_menu(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data == EDIT_EVENT_BACK)
 async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
+    await safe_answer_callback(callback)
     data = await state.get_data()
     stack = list(data.get("edit_stack", []))
     if not stack:
