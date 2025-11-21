@@ -4,6 +4,7 @@ import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from zoneinfo import ZoneInfo
@@ -25,7 +26,8 @@ async def main() -> None:
         await run_schema_setup()
         services = build_services(config)
         set_services(services)
-        bot = Bot(token=config.bot.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        session = AiohttpSession(timeout=30.0)
+        bot = Bot(token=config.bot.token, session=session, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         dp = Dispatcher()
         setup_handlers(dp)
         
@@ -43,7 +45,7 @@ async def main() -> None:
                 await services.reminders.process_due_reminders(bot)
             scheduler.add_job(reminders_job, "cron", minute="*/5", id="reminders")
             scheduler.start()
-            await dp.start_polling(bot)
+            await dp.start_polling(bot, polling_timeout=20)
         finally:
             if scheduler:
                 scheduler.shutdown(wait=False)
