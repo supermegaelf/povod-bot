@@ -1,7 +1,5 @@
 import asyncio
 import logging
-from datetime import datetime, time
-
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -28,6 +26,7 @@ from bot.utils.callbacks import (
 )
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
+from bot.utils.events import has_event_started
 from bot.utils.i18n import t
 from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
 from bot.keyboards.event_card import promocode_back_keyboard
@@ -74,7 +73,14 @@ async def show_event(callback: CallbackQuery) -> None:
         stats = type('Stats', (), {'going': 0})()
     availability = services.registrations.availability(event.max_participants, stats.going)
     text = format_event_card(event, availability, discount if discount > 0 else None)
-    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
+    event_started = has_event_started(event)
+    markup = event_card_keyboard(
+        event.id,
+        is_paid=is_paid,
+        is_paid_event=is_paid_event,
+        is_registered=is_registered,
+        allow_payment=not event_started,
+    )
     
     MAX_CAPTION_LENGTH = 1024
     caption_text = text[:MAX_CAPTION_LENGTH] if len(text) > MAX_CAPTION_LENGTH else text
@@ -111,8 +117,8 @@ async def show_event(callback: CallbackQuery) -> None:
                 logger.warning(f"[show_event] Edit failed: {e}, sending new then deleting old")
                 new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
-            if cleanup_start > 0:
-                asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
+        if cleanup_start > 0:
+            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
     await safe_answer_callback(callback)
 
 
@@ -193,6 +199,10 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
     if event is None:
         return
 
+    if has_event_started(event):
+        await safe_answer_callback(callback, text=t("payment.event_started"), show_alert=True)
+        return
+
     text = t("payment.method_prompt")
     markup = payment_method_keyboard(event_id)
 
@@ -222,6 +232,10 @@ async def process_payment(callback: CallbackQuery) -> None:
     event = await services.events.get_event(event_id)
     if event is None:
         await safe_answer_callback(callback, text=t("error.event_not_found"), show_alert=True)
+        return
+
+    if has_event_started(event):
+        await safe_answer_callback(callback, text=t("payment.event_started"), show_alert=True)
         return
 
     tg_user = callback.from_user
@@ -330,9 +344,7 @@ async def process_promocode(message: Message, state: FSMContext) -> None:
         await message.answer(t("error.event_not_found"))
         return
 
-    event_time = event.time or time(0, 0)
-    event_start = datetime.combine(event.date, event_time)
-    if datetime.now() >= event_start:
+    if has_event_started(event):
         await state.clear()
         await message.answer(t("promocode.error.expired"), reply_markup=promocode_back_keyboard(event_id))
         return
@@ -414,8 +426,15 @@ async def refund_event(callback: CallbackQuery) -> None:
     
     stats = await services.registrations.get_stats(event.id)
     availability = services.registrations.availability(event.max_participants, stats.going)
+    event_started = has_event_started(event)
     text = format_event_card(event, availability, discount if discount > 0 else None)
-    markup = event_card_keyboard(event.id, is_paid=is_paid, is_paid_event=is_paid_event, is_registered=is_registered)
+    markup = event_card_keyboard(
+        event.id,
+        is_paid=is_paid,
+        is_paid_event=is_paid_event,
+        is_registered=is_registered,
+        allow_payment=not event_started,
+    )
     
     MAX_CAPTION_LENGTH = 1024
     caption_text = text[:MAX_CAPTION_LENGTH] if len(text) > MAX_CAPTION_LENGTH else text

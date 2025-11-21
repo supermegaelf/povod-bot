@@ -632,7 +632,7 @@ async def open_manage_events(callback: CallbackQuery, state: FSMContext) -> None
     if not services.users.is_moderator(user):
         return
     await state.clear()
-    events = await services.events.get_active_events(limit=20)
+    events = await services.events.get_active_events(limit=20, include_started=True)
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -665,7 +665,7 @@ async def manage_events_page(callback: CallbackQuery, state: FSMContext) -> None
         await safe_answer_callback(callback, text=t("common.no_permissions"), show_alert=True)
         return
     page = int(callback.data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
-    events = await services.events.get_active_events(limit=20)
+    events = await services.events.get_active_events(limit=20, include_started=True)
     if not events:
         if callback.message:
             await _remove_prompt_message(callback.message, state)
@@ -1079,16 +1079,15 @@ async def list_event_promocodes(callback: CallbackQuery, state: FSMContext) -> N
             else:
                 event_start_str = event_date_str
             lines = []
-            for p in promocodes:
-                lines.append(
-                    t(
-                        "promocode.admin.list_item",
-                        code=p.code,
-                        discount=f"{p.discount_amount:.0f}",
-                        event_start=event_start_str,
-                    )
+            for idx, p in enumerate(promocodes, start=1):
+                item_text = t(
+                    "promocode.admin.list_item",
+                    code=p.code,
+                    discount=f"{p.discount_amount:.0f}",
+                    event_start=event_start_str,
                 )
-            text = "\n".join(lines)
+                lines.append(f"{idx}. {item_text}")
+            text = "\n\n".join(lines)
             await _send_prompt_text(
                 callback.message,
                 state,
@@ -1166,16 +1165,20 @@ async def process_promocode_code_input(message: Message, state: FSMContext) -> N
         )
         normalized_code = code.strip().upper()
         if deleted:
-            await message.answer(
+            await _send_prompt_text(
+                message,
+                state,
                 t("promocode.admin.delete_success", code=normalized_code),
-                reply_markup=manage_promocode_actions_keyboard(event_id),
+                manage_promocode_actions_keyboard(event_id),
             )
         else:
             await state.set_state(PromocodeAdminState.code_input)
             await state.update_data(promocode_event_id=event_id, promocode_delete_mode=True)
-            await message.answer(
+            await _send_prompt_text(
+                message,
+                state,
                 t("promocode.admin.delete_not_found"),
-                reply_markup=promocode_input_keyboard(event_id),
+                promocode_input_keyboard(event_id),
             )
         return
     await state.update_data(promocode_code=code)
@@ -1257,9 +1260,11 @@ async def process_promocode_discount_input(message: Message, state: FSMContext) 
         edit_stack=existing_stack,
     )
     normalized_code = code.strip().upper()
-    await message.answer(
+    await _send_prompt_text(
+        message,
+        state,
         t("promocode.admin.add_success", code=normalized_code, discount=f"{value:.0f}"),
-        reply_markup=manage_promocode_actions_keyboard(event_id),
+        manage_promocode_actions_keyboard(event_id),
     )
 
 
@@ -1360,7 +1365,7 @@ async def edit_back(callback: CallbackQuery, state: FSMContext) -> None:
         return
     if not stack:
         services = get_services()
-        events = await services.events.get_active_events()
+        events = await services.events.get_active_events(include_started=True)
         await state.clear()
         if callback.message:
             if events:

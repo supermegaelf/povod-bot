@@ -7,6 +7,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, TelegramObject
 
 from bot.utils.i18n import t
+from bot.utils.events import has_event_started
 
 logger = logging.getLogger(__name__)
 
@@ -149,11 +150,13 @@ class MessageRefreshMiddleware(BaseMiddleware):
                 stats = await services.registrations.get_stats(event_id)
                 availability = services.registrations.availability(event.max_participants, stats.going)
                 text = format_event_card(event, availability, discount if discount > 0 else None)
+                event_started = has_event_started(event)
                 markup = event_card_keyboard(
                     event_id,
                     is_paid=is_paid,
                     is_paid_event=is_paid_event,
                     is_registered=is_registered,
+                    allow_payment=not event_started,
                 )
                 if callback.message.photo:
                     await callback.message.edit_caption(caption=text, reply_markup=markup)
@@ -226,7 +229,7 @@ class MessageRefreshMiddleware(BaseMiddleware):
         
         elif data.startswith(MANAGE_EVENTS_PAGE_PREFIX):
             page = int(data.removeprefix(MANAGE_EVENTS_PAGE_PREFIX))
-            events = await services.events.get_active_events(limit=20)
+            events = await services.events.get_active_events(limit=20, include_started=True)
             if events:
                 markup = manage_events_keyboard(events, page=page)
                 text = t("menu.actual_prompt")
