@@ -52,6 +52,9 @@ class UserService:
     async def get_by_id(self, user_id: int) -> Optional[User]:
         return await self._repository.get_by_id(user_id)
 
+    async def get_by_telegram_id(self, telegram_id: int) -> Optional[User]:
+        return await self._repository.get_by_telegram_id(telegram_id)
+
     async def list_all_telegram_ids(self) -> Sequence[int]:
         return await self._repository.list_all_telegram_ids()
 

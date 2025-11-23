@@ -1,8 +1,21 @@
+import asyncio
+
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import CallbackQuery, Message
 
 _LAST_USER_MESSAGES: dict[int, int] = {}
+
+
+async def remember_bot_message(chat_id: int, message_id: int) -> None:
+    try:
+        from bot.utils.di import get_services
+        services = get_services()
+        user = await services.users.get_by_telegram_id(chat_id)
+        if user:
+            await services.bot_messages.save_message(user.id, chat_id, message_id)
+    except Exception:
+        pass
 
 
 def remember_user_message(message: Message) -> None:
@@ -54,6 +67,34 @@ async def safe_answer_callback(callback: CallbackQuery, text: str | None = None,
             pass
         else:
             raise
+    except Exception:
+        pass
+
+
+async def safe_delete_stored_bot_messages(bot: Bot, chat_id: int, exclude_message_id: int | None = None) -> None:
+    try:
+        from bot.utils.di import get_services
+        services = get_services()
+        messages = await services.bot_messages.get_recent_messages(chat_id, hours=48)
+        
+        message_ids_to_delete = []
+        for msg in messages:
+            if exclude_message_id and msg.message_id == exclude_message_id:
+                continue
+            message_ids_to_delete.append((msg.chat_id, msg.message_id))
+        
+        deleted_from_telegram = []
+        for chat_id_msg, msg_id in message_ids_to_delete:
+            try:
+                await bot.delete_message(chat_id_msg, msg_id)
+                deleted_from_telegram.append((chat_id_msg, msg_id))
+            except (TelegramBadRequest, TelegramAPIError):
+                pass
+            except Exception:
+                pass
+        
+        if deleted_from_telegram:
+            await services.bot_messages.delete_messages(deleted_from_telegram)
     except Exception:
         pass
 

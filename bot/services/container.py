@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from config import Config
+from .bot_message_service import BotMessageService, build_bot_message_service
 from .event_service import EventService, build_event_service
 from .payment_service import PaymentService, build_payment_service
 from .promocode_service import PromocodeService, build_promocode_service
@@ -17,6 +18,7 @@ class ServiceContainer:
     reminders: ReminderService
     payments: PaymentService
     promocodes: PromocodeService
+    bot_messages: BotMessageService
 
 
 def build_services(config: Config) -> ServiceContainer:
@@ -26,6 +28,7 @@ def build_services(config: Config) -> ServiceContainer:
     reminders = build_reminder_service(events, registrations, config.reminders)
     payments = build_payment_service(config.yookassa)
     promocodes = build_promocode_service(events)
+    bot_messages = build_bot_message_service()
     return ServiceContainer(
         users=users,
         events=events,
@@ -33,5 +36,6 @@ def build_services(config: Config) -> ServiceContainer:
         reminders=reminders,
         payments=payments,
         promocodes=promocodes,
+        bot_messages=bot_messages,
     )
 

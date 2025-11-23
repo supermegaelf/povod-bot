@@ -44,6 +44,13 @@ async def main() -> None:
             async def reminders_job() -> None:
                 await services.reminders.process_due_reminders(bot)
             scheduler.add_job(reminders_job, "cron", minute="*/5", id="reminders")
+            
+            async def cleanup_old_messages_job() -> None:
+                deleted_count = await services.bot_messages.cleanup_old_messages(older_than_hours=48)
+                if deleted_count > 0:
+                    logging.info(f"Cleaned up {deleted_count} old bot message records from database")
+            scheduler.add_job(cleanup_old_messages_job, "cron", hour="*/6", id="cleanup_old_messages")
+            
             scheduler.start()
             await dp.start_polling(bot, polling_timeout=20)
         finally:

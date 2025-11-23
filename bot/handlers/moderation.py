@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import date, datetime, time
 
@@ -64,7 +65,7 @@ from bot.utils.callbacks import (
 from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.constants import MAX_EVENT_IMAGES
-from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_message, safe_delete_by_id
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_message, safe_delete_by_id, safe_delete_stored_bot_messages, safe_delete_recent_bot_messages
 from bot.utils.i18n import t
 
 router = Router()
@@ -854,7 +855,11 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == HIDE_MESSAGE)
 async def hide_message(callback: CallbackQuery) -> None:
     if callback.message:
+        bot = callback.message.bot
+        chat_id = callback.message.chat.id
+        message_id = callback.message.message_id
         await safe_delete(callback.message)
+        asyncio.create_task(safe_delete_stored_bot_messages(bot, chat_id, exclude_message_id=message_id))
 
 
 @router.callback_query(F.data.startswith(EDIT_EVENT_CANCEL_EVENT_PREFIX))

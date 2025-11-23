@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.keyboards import main_menu_keyboard
 from bot.utils.callbacks import START_MAIN_MENU
 from bot.utils.di import get_config, get_services
-from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete
+from bot.utils.messaging import remember_user_message, remember_bot_message, safe_answer_callback, safe_delete
 from bot.utils.i18n import t
 
 router = Router()
@@ -40,7 +40,8 @@ async def handle_start(message: Message) -> None:
             pass
     
     config = get_config()
-    await message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard, disable_web_page_preview=True)
+    sent_message = await message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard, disable_web_page_preview=True)
+    await remember_bot_message(chat_id, sent_message.message_id)
 
 
 @router.callback_query(F.data == START_MAIN_MENU)
