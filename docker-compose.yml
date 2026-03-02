@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-povod}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-povod}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,13 +20,14 @@ services:
 
   bot:
     build: .
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     env_file:
       - .env
     ports:
-      - "8777:8777"
+      - "127.0.0.1:8777:8777"
     command: python bot.py
 
 volumes:
