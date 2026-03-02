@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.keyboards import main_menu_keyboard
 from bot.utils.callbacks import START_MAIN_MENU
 from bot.utils.di import get_config, get_services
-from bot.utils.messaging import remember_user_message, safe_answer_callback, send_or_edit
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, send_or_edit
 from bot.utils.i18n import t
 
 router = Router()
@@ -25,20 +25,7 @@ async def handle_start(message: Message) -> None:
     raw_name = (tg_user.full_name or tg_user.username or "").strip()
     display_name = escape(raw_name) if raw_name else t("start.fallback_name")
     keyboard = main_menu_keyboard(services.users.is_moderator(user))
-    
-    bot = message.bot
-    chat_id = message.chat.id
-    message_id = message.message_id
-    
-    for i in range(1, 51):
-        msg_id = message_id - i
-        if msg_id <= 0:
-            break
-        try:
-            await bot.delete_message(chat_id, msg_id)
-        except Exception:
-            pass
-    
+    await safe_delete(message)
     config = get_config()
     await message.answer(t("menu.title", name=display_name, about_us_url=config.support.about_us_url), reply_markup=keyboard, disable_web_page_preview=True)
 

@@ -28,7 +28,7 @@ class PaymentService:
         description: str,
         payment_message_id: Optional[int] = None,
     ) -> tuple[str, Optional[str]]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         payment_data = {
             "amount": {"value": f"{amount:.2f}", "currency": "RUB"},
             "confirmation": {
@@ -78,7 +78,7 @@ class PaymentService:
 
     async def refund_payment(self, payment_id: str, amount: float) -> bool:
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             refund_data = {
                 "amount": {"value": f"{amount:.2f}", "currency": "RUB"},
                 "payment_id": payment_id,
@@ -88,18 +88,21 @@ class PaymentService:
                 None,
                 lambda: Refund.create(refund_data, refund_idempotency_key),
             )
-            logger.info(f"Refund created: refund_id={refund.id}, payment_id={payment_id}, amount={amount}")
+            logger.info(f"Refund created: refund_id={refund.id}, payment_id={payment_id}, status={refund.status}, amount={amount}")
+            # Immediately lock the payment against re-refund regardless of YooKassa's async status.
+            # get_successful_payment() queries WHERE status = 'succeeded', so setting 'refund_pending'
+            # breaks the double-refund cycle even if YooKassa responds with status='pending'.
+            await self._repository.update_status(payment_id, "refund_pending", None)
             if refund.status == "succeeded":
                 await self._repository.update_status(payment_id, "refunded", None)
-                return True
-            return False
+            return True
         except Exception as e:
             logger.error(f"Failed to create refund: {e}", exc_info=True)
             return False
 
     async def handle_webhook(self, payment_id: str) -> Optional[PaymentModel]:
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             payment = await loop.run_in_executor(None, Payment.find_one, payment_id)
         except Exception:
             return None

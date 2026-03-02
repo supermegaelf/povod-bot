@@ -5,37 +5,16 @@ from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 
-from config import load_config
-from bot.database import close_pool, init_pool, run_schema_setup
-from bot.services.container import build_services
-from bot.utils.di import set_config, set_services
+from bot.utils.di import get_config, get_services
 
 logger = logging.getLogger(__name__)
-
-_services_initialized = False
-
-
-async def _ensure_services_initialized() -> None:
-    global _services_initialized
-    if _services_initialized:
-        return
-
-    config = load_config()
-    set_config(config)
-    await init_pool(config.database.dsn)
-    await run_schema_setup()
-    services = build_services(config)
-    set_services(services)
-    _services_initialized = True
 
 
 async def yookassa_webhook_handler(request: Request) -> Response:
     logger.info(f"Received {request.method} request to {request.path_qs}")
     logger.info(f"Headers: {dict(request.headers)}")
-    
+
     try:
-        await _ensure_services_initialized()
-        from bot.utils.di import get_services
 
         try:
             data = await request.json()
@@ -150,33 +129,34 @@ async def yookassa_webhook_handler(request: Request) -> Response:
                     from aiogram.enums import ParseMode
                     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
                     from bot.utils.callbacks import event_view
-                    from bot.utils.di import get_config
                     from bot.utils.i18n import t
 
                     config = get_config()
                     bot = Bot(token=config.bot.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-                    event_obj = await services.events.get_event(payment.event_id)
-                    if event_obj:
-                        if payment.payment_message_id:
-                            try:
-                                await bot.delete_message(user.telegram_id, payment.payment_message_id)
-                                logger.info(f"Deleted payment message {payment.payment_message_id}")
-                            except Exception as e:
-                                logger.warning(f"Failed to delete payment message: {e}")
-                        
-                        logger.info(f"Sending success notification to user {user.telegram_id}")
-                        markup = InlineKeyboardMarkup(
-                            inline_keyboard=[
-                                [InlineKeyboardButton(text=t("button.back"), callback_data=event_view(payment.event_id))],
-                            ]
-                        )
-                        await bot.send_message(
-                            user.telegram_id,
-                            t("payment.success", title=event_obj.title),
-                            reply_markup=markup,
-                        )
-                        logger.info(f"Success notification sent")
-                    await bot.session.close()
+                    try:
+                        event_obj = await services.events.get_event(payment.event_id)
+                        if event_obj:
+                            if payment.payment_message_id:
+                                try:
+                                    await bot.delete_message(user.telegram_id, payment.payment_message_id)
+                                    logger.info(f"Deleted payment message {payment.payment_message_id}")
+                                except Exception as e:
+                                    logger.warning(f"Failed to delete payment message: {e}")
+
+                            logger.info(f"Sending success notification to user {user.telegram_id}")
+                            markup = InlineKeyboardMarkup(
+                                inline_keyboard=[
+                                    [InlineKeyboardButton(text=t("button.back"), callback_data=event_view(payment.event_id))],
+                                ]
+                            )
+                            await bot.send_message(
+                                user.telegram_id,
+                                t("payment.success", title=event_obj.title),
+                                reply_markup=markup,
+                            )
+                            logger.info(f"Success notification sent")
+                    finally:
+                        await bot.session.close()
                 else:
                     logger.warning(f"User {payment.user_id} not found or has no telegram_id")
             except Exception as e:

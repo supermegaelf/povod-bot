@@ -34,6 +34,7 @@ from bot.keyboards.event_card import promocode_back_keyboard
 router = Router()
 
 _MEDIA_MESSAGE_MAP: dict[tuple[int, int], list[int]] = {}
+_MAX_MEDIA_MAP_SIZE = 500
 
 
 @router.callback_query(F.data.startswith(EVENT_VIEW_PREFIX))
@@ -118,7 +119,7 @@ async def show_event(callback: CallbackQuery) -> None:
                 new_message = await bot.send_message(chat_id, text, reply_markup=markup)
                 await safe_delete(callback.message)
         if cleanup_start > 0:
-            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=50))
+            asyncio.create_task(safe_delete_recent_bot_messages(bot, chat_id, cleanup_start, count=10))
     await safe_answer_callback(callback)
 
 
@@ -407,6 +408,8 @@ def _remember_media_group(anchor: Message, media_messages: list[Message]) -> Non
     if not media_messages:
         return
     key = (anchor.chat.id, anchor.message_id)
+    if len(_MEDIA_MESSAGE_MAP) >= _MAX_MEDIA_MAP_SIZE:
+        _MEDIA_MESSAGE_MAP.pop(next(iter(_MEDIA_MESSAGE_MAP)))
     _MEDIA_MESSAGE_MAP[key] = [message.message_id for message in media_messages]
 
 
