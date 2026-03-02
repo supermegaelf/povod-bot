@@ -28,7 +28,7 @@ from bot.utils.di import get_services
 from bot.utils.formatters import format_event_card
 from bot.utils.events import has_event_started
 from bot.utils.i18n import t
-from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages
+from bot.utils.messaging import remember_user_message, safe_answer_callback, safe_delete, safe_delete_by_id, safe_delete_recent_bot_messages, send_or_edit
 from bot.keyboards.event_card import promocode_back_keyboard
 
 router = Router()
@@ -128,30 +128,14 @@ async def back_to_list(callback: CallbackQuery) -> None:
     tg_user = callback.from_user
     user = await services.users.ensure(tg_user.id, tg_user.username, tg_user.first_name, tg_user.last_name)
     events = await services.events.get_active_events()
-    if not events:
-        if callback.message:
-            await _cleanup_media_group(callback.message)
-            try:
-                await callback.message.edit_text(
-                    t("menu.actual_empty"),
-                    reply_markup=back_to_main_keyboard(),
-                )
-            except Exception:
-                new_message = await callback.message.answer(
-                    t("menu.actual_empty"),
-                    reply_markup=back_to_main_keyboard(),
-                )
-                await safe_delete(callback.message)
-        await safe_answer_callback(callback)
-        return
     if callback.message:
         await _cleanup_media_group(callback.message)
-        keyboard = event_list_keyboard(events)
-        try:
-            await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
-        except Exception:
-            new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
-            await safe_delete(callback.message)
+    if not events:
+        await send_or_edit(callback, t("menu.actual_empty"), reply_markup=back_to_main_keyboard(), is_edit=True)
+        await safe_answer_callback(callback)
+        return
+    keyboard = event_list_keyboard(events)
+    await send_or_edit(callback, t("menu.actual_prompt"), reply_markup=keyboard, is_edit=True)
     await safe_answer_callback(callback)
 
 
@@ -162,30 +146,14 @@ async def event_list_page(callback: CallbackQuery) -> None:
     page = int(callback.data.removeprefix(EVENT_LIST_PAGE_PREFIX))
     services = get_services()
     events = await services.events.get_active_events()
-    if not events:
-        if callback.message:
-            await _cleanup_media_group(callback.message)
-            try:
-                await callback.message.edit_text(
-                    t("menu.actual_empty"),
-                    reply_markup=back_to_main_keyboard(),
-                )
-            except Exception:
-                new_message = await callback.message.answer(
-                    t("menu.actual_empty"),
-                    reply_markup=back_to_main_keyboard(),
-                )
-                await safe_delete(callback.message)
-        await safe_answer_callback(callback)
-        return
     if callback.message:
         await _cleanup_media_group(callback.message)
-        keyboard = event_list_keyboard(events, page=page)
-        try:
-            await callback.message.edit_text(t("menu.actual_prompt"), reply_markup=keyboard)
-        except Exception:
-            new_message = await callback.message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
-            await safe_delete(callback.message)
+    if not events:
+        await send_or_edit(callback, t("menu.actual_empty"), reply_markup=back_to_main_keyboard(), is_edit=True)
+        await safe_answer_callback(callback)
+        return
+    keyboard = event_list_keyboard(events, page=page)
+    await send_or_edit(callback, t("menu.actual_prompt"), reply_markup=keyboard, is_edit=True)
     await safe_answer_callback(callback)
 
 
@@ -208,11 +176,7 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
 
     if callback.message:
         await _cleanup_media_group(callback.message)
-        try:
-            await callback.message.edit_text(text, reply_markup=markup)
-        except Exception:
-            new_message = await callback.message.answer(text, reply_markup=markup)
-            await safe_delete(callback.message)
+    await send_or_edit(callback, text, reply_markup=markup, is_edit=True)
     await safe_answer_callback(callback)
 
 
@@ -274,17 +238,11 @@ async def process_payment(callback: CallbackQuery) -> None:
         ]
     )
 
-    payment_message = None
     if callback.message:
         await _cleanup_media_group(callback.message)
-        try:
-            payment_message = await callback.message.edit_text(text, reply_markup=markup)
-        except Exception:
-            payment_message = await callback.message.answer(text, reply_markup=markup)
-            await safe_delete(callback.message)
-        
-        if payment_message:
-            await services.payments.update_message_id(payment_id, payment_message.message_id)
+    payment_message = await send_or_edit(callback, text, reply_markup=markup, is_edit=True)
+    if payment_message:
+        await services.payments.update_message_id(payment_id, payment_message.message_id)
     
     await safe_answer_callback(callback)
 
@@ -310,17 +268,7 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(promocode_event_id=event.id)
     if callback.message:
         await _cleanup_media_group(callback.message)
-        try:
-            await callback.message.edit_text(
-                t("promocode.prompt"),
-                reply_markup=promocode_back_keyboard(event.id),
-            )
-        except Exception:
-            new_message = await callback.message.answer(
-                t("promocode.prompt"),
-                reply_markup=promocode_back_keyboard(event.id),
-            )
-            await safe_delete(callback.message)
+    await send_or_edit(callback, t("promocode.prompt"), reply_markup=promocode_back_keyboard(event.id), is_edit=True)
     await safe_answer_callback(callback)
 
 

@@ -1,3 +1,5 @@
+from typing import Union
+
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import CallbackQuery, Message
@@ -56,6 +58,44 @@ async def safe_answer_callback(callback: CallbackQuery, text: str | None = None,
             raise
     except Exception:
         pass
+
+
+async def send_or_edit(
+    target: Union[Message, CallbackQuery],
+    text: str,
+    reply_markup=None,
+    is_edit: bool = False,
+    **kwargs,
+) -> Message | None:
+    """
+    Unified send/edit for navigation handlers.
+
+    - is_edit=False  → answer() (used from /commands)
+    - is_edit=True   → edit_text() with fallback to answer() (used from callbacks)
+      - "message is not modified" is silently ignored (returns the existing message)
+      - Any other edit failure falls back to answer() without deleting the old message
+    Returns None if the underlying message object is unavailable.
+    """
+    msg: Message | None
+    if isinstance(target, CallbackQuery):
+        msg = target.message
+    else:
+        msg = target
+
+    if msg is None:
+        return None
+
+    if is_edit:
+        try:
+            return await msg.edit_text(text, reply_markup=reply_markup, **kwargs)
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                return msg
+        except Exception:
+            pass
+        return await msg.answer(text, reply_markup=reply_markup, **kwargs)
+
+    return await msg.answer(text, reply_markup=reply_markup, **kwargs)
 
 
 async def safe_delete_recent_bot_messages(bot: Bot, chat_id: int, start_message_id: int, count: int = 100, exclude_message_id: int | None = None) -> None:
