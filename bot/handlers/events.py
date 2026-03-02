@@ -131,12 +131,13 @@ async def back_to_list(callback: CallbackQuery) -> None:
     events = await services.events.get_active_events()
     if callback.message:
         await _cleanup_media_group(callback.message)
-    if not events:
-        await send_or_edit(callback, t("menu.actual_empty"), reply_markup=back_to_main_keyboard(), is_edit=True)
-        await safe_answer_callback(callback)
-        return
-    keyboard = event_list_keyboard(events)
-    await send_or_edit(callback, t("menu.actual_prompt"), reply_markup=keyboard, is_edit=True)
+        old_message = callback.message
+        if not events:
+            await old_message.answer(t("menu.actual_empty"), reply_markup=back_to_main_keyboard())
+        else:
+            keyboard = event_list_keyboard(events)
+            await old_message.answer(t("menu.actual_prompt"), reply_markup=keyboard)
+        await safe_delete(old_message)
     await safe_answer_callback(callback)
 
 
@@ -177,7 +178,9 @@ async def show_payment_methods(callback: CallbackQuery) -> None:
 
     if callback.message:
         await _cleanup_media_group(callback.message)
-    await send_or_edit(callback, text, reply_markup=markup, is_edit=True)
+        old_message = callback.message
+        await old_message.answer(text, reply_markup=markup)
+        await safe_delete(old_message)
     await safe_answer_callback(callback)
 
 
