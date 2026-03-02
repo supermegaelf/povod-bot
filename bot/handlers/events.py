@@ -269,7 +269,9 @@ async def start_promocode(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(promocode_event_id=event.id)
     if callback.message:
         await _cleanup_media_group(callback.message)
-    await send_or_edit(callback, t("promocode.prompt"), reply_markup=promocode_back_keyboard(event.id), is_edit=True)
+        old_message = callback.message
+        await old_message.answer(t("promocode.prompt"), reply_markup=promocode_back_keyboard(event.id))
+        await safe_delete(old_message)
     await safe_answer_callback(callback)
 
 
